@@ -116,6 +116,7 @@ import {
   getLastCloudWriteError
 } from './utils/cloudDatabase';
 import { mergeWithPendingWrites, countPendingWrites } from './utils/cloudOutbox';
+import { uploadClientBackupToDrive } from './utils/googleDriveBackup';
 
 // Components
 import { Navbar } from './components/Navbar';
@@ -290,6 +291,10 @@ export default function App() {
   const storesRef = useRef(stores);
   servicesRef.current = services;
   storesRef.current = stores;
+  const obrasRef = useRef(obras);
+  const visitasRef = useRef(visitas);
+  obrasRef.current = obras;
+  visitasRef.current = visitas;
 
   // A identidade da aplicação é reconstruída exclusivamente pelo observador do Firebase Auth.
   // Perfis pendentes nunca recebem sessão de aplicação nem acesso aos dados.
@@ -966,16 +971,22 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, [syncSettings.autoSyncEnabled, syncSettings.syncIntervalSeconds]);
 
-  // Automated Scheduled Firebase Backup Runner (Checks scheduled hours every 25 seconds)
+  // Backup automático no Firebase (ADM): verifica a cada 25 s; se o horário do dia
+  // (04:00) já passou e o backup ainda não foi feito, executa — inclusive ao abrir o app.
   useEffect(() => {
     if (user?.role !== 'admin') return;
-    const backupInterval = setInterval(async () => {
+    let lastAttemptAt = 0;
+    let running = false;
+    const runCheck = async () => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       const currentConfig = loadScheduledBackupConfig();
       if (!currentConfig.enabled) return;
 
       const check = checkShouldRunScheduledBackup(currentConfig, new Date());
-      if (check.shouldRun) {
+      // Em caso de falha, tenta de novo no máximo a cada 15 minutos.
+      if (check.shouldRun && !running && Date.now() - lastAttemptAt > 15 * 60 * 1000) {
+        running = true;
+        lastAttemptAt = Date.now();
         console.log(`[BackupScheduler] Horário programado atingido (${check.timeStr}). Realizando backup automático no Firebase...`);
         const res = await executeScheduledFirebaseBackup('scheduled', {
           slotKey: check.slotKey,
@@ -989,11 +1000,62 @@ export default function App() {
             type: 'status',
           });
         }
+        running = false;
       }
-    }, 25000);
+    };
+    const firstCheck = window.setTimeout(() => { void runCheck(); }, 8000);
+    const backupInterval = setInterval(() => { void runCheck(); }, 25000);
 
-    return () => clearInterval(backupInterval);
+    return () => { clearTimeout(firstCheck); clearInterval(backupInterval); };
   }, [user?.role, user?.email]);
+
+  // Backup automático do perfil do cliente no Google Drive dele, diário a partir
+  // das 04:00 (ou na primeira abertura do app depois desse horário). Só usa uma
+  // autorização do Drive já concedida — nunca abre janela sozinho.
+  useEffect(() => {
+    if (user?.role !== 'client' || user.status !== 'active') return;
+    const uid = user.id;
+    const doneKey = `samines_client_drive_auto_backup_v1_${uid}`;
+    let lastAttemptAt = 0;
+    let running = false;
+    const runCheck = async () => {
+      if (running || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+      const now = new Date();
+      const scheduled = (loadScheduledBackupConfig().googleDriveScheduledTime || '04:00').split(':').map(Number);
+      if (now.getHours() * 60 + now.getMinutes() < (scheduled[0] || 4) * 60 + (scheduled[1] || 0)) return;
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      let lastDone = '';
+      try { lastDone = localStorage.getItem(doneKey) || ''; } catch { /* ignore */ }
+      if (lastDone === today || Date.now() - lastAttemptAt < 30 * 60 * 1000) return;
+      if (servicesRef.current.length === 0 && visitasRef.current.length === 0) return;
+      running = true;
+      lastAttemptAt = Date.now();
+      try {
+        const result = await uploadClientBackupToDrive({
+          services: servicesRef.current,
+          stores: storesRef.current,
+          obras: obrasRef.current,
+          visitas: visitasRef.current,
+          clientEmail: user.email,
+          clientName: user.name,
+          isAutoScheduled: true,
+          customNote: 'Backup automático diário (04:00)',
+          interactive: false,
+        });
+        if (result.success) {
+          try { localStorage.setItem(doneKey, today); } catch { /* ignore */ }
+          console.info('[ClientBackup] Backup automático salvo no Google Drive:', result.fileName);
+        } else {
+          console.info('[ClientBackup] Backup automático adiado:', result.error);
+        }
+      } finally {
+        running = false;
+      }
+    };
+    const firstCheck = window.setTimeout(() => { void runCheck(); }, 15000);
+    const intervalId = window.setInterval(() => { void runCheck(); }, 5 * 60 * 1000);
+    return () => { clearTimeout(firstCheck); clearInterval(intervalId); };
+  }, [user?.id, user?.role, user?.status]);
 
   // Handler for manual sync trigger
   const handleTriggerManualSync = async () => {

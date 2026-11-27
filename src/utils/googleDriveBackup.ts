@@ -78,10 +78,12 @@ export async function uploadClientBackupToDrive(params: {
   clientName?: string;
   isAutoScheduled?: boolean;
   customNote?: string;
+  /** false = backup automático: nunca abre janela de autorização (seria bloqueada). */
+  interactive?: boolean;
 }): Promise<DriveUploadResult> {
   // 1. Garante o token do Google Drive
   let token = getCachedAccessToken();
-  if (!token) {
+  if (!token && params.interactive !== false) {
     token = await requestDriveAccessToken();
   }
 

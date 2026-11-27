@@ -200,9 +200,13 @@ export function checkShouldRunScheduledBackup(
     const [h, m] = timeStr.split(':').map(Number);
     const scheduledMinutesOfDay = h * 60 + m;
 
-    // Janela de ativação: dentro de 2 minutos do horário programado
+    // Recuperação automática: um app web não consegue "acordar" às 04:00 se
+    // estiver fechado. Antes, o backup só rodava se o app estivesse aberto entre
+    // 04:00 e 04:02 — na prática quase nunca. Agora, se o horário de hoje já
+    // passou e o backup do dia ainda não foi feito, ele roda na próxima vez que o
+    // app estiver aberto (uma única vez por horário por dia).
     const diff = currentMinutesOfDay - scheduledMinutesOfDay;
-    if (diff >= 0 && diff <= 2) {
+    if (diff >= 0) {
       const slotKey = `${dateKey}_${timeStr}`;
       // Se este slot específico ainda não foi executado
       if (config.lastExecutedSlot !== slotKey) {
