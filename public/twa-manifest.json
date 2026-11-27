@@ -1,0 +1,27 @@
+{
+  "packageId": "com.empreiteirosamines.app",
+  "host": "ais-pre-vyyn7cpx3u23hhljqmdfwa-807875782195.us-east1.run.app",
+  "name": "Empreiteiro Saminês",
+  "launcherName": "Saminês",
+  "themeColor": "#15803d",
+  "navigationColor": "#0f172a",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "/logo-512.png",
+  "maskableIconUrl": "/logo-512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Novo Serviço",
+      "shortName": "Novo",
+      "url": "/?action=new-service",
+      "icon": "/logo-192.png"
+    }
+  ],
+  "generator": "PWABuilder / Google Bubblewrap",
+  "fallbackType": "customtabs",
+  "display": "standalone",
+  "orientation": "default"
+}

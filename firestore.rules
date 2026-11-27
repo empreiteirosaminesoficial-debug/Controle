@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'empreiteirosaminesoficial@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function validStoreReference(storeId) {
+      return storeId is string
+        && storeId.size() > 0
+        && exists(/databases/$(database)/documents/stores/$(storeId));
+    }
+
+    function isStoreAvailable(storeId) {
+      let storePath = /databases/$(database)/documents/stores/$(storeId);
+      // Cadastros legados sem campo status continuam compatíveis; estados
+      // desconhecidos ou explicitamente bloqueados não concedem acesso.
+      return exists(storePath)
+        && (!('status' in get(storePath).data) || get(storePath).data.status == 'active');
+    }
+
+    function isStoreMember(storeId) {
+      // A associação precisa existir, estar ativa e constar em uma solicitação
+      // atualmente aprovada. Assim, mudar o status do pedido para rejeitado ou
+      // pendente revoga o acesso mesmo se um subdocumento antigo permanecer.
+      let memberPath = /databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid);
+      let requestPath = /databases/$(database)/documents/accessRequests/$(request.auth.uid);
+      return signedIn()
+        && storeId is string
+        && exists(requestPath)
+        && get(requestPath).data.status == 'approved'
+        && get(requestPath).data.storeIds is list
+        && get(requestPath).data.storeIds.hasAny([storeId])
+        && exists(memberPath)
+        && get(memberPath).data.status == 'active'
+        && get(memberPath).data.uid == request.auth.uid
+        && get(memberPath).data.storeId == storeId
+        && isStoreAvailable(storeId);
+    }
+
+    // O cliente cria somente a própria solicitação. Aprovação e storeIds são controlados pelo admin.
+    match /accessRequests/{uid} {
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'status', 'requestedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedAt == request.time;
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Cadastro de estabelecimentos é administrativo; cliente só lê um documento
+    // específico quando existe vínculo ativo no subdocumento members/{uid}.
+    match /stores/{storeId} {
+      allow get: if isAdmin() || isStoreMember(storeId);
+      allow list, create, update, delete: if isAdmin();
+      match /members/{uid} {
+        allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+        allow list: if isAdmin();
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    // Consultas do cliente precisam filtrar por storeId; cada documento ainda
+    // é validado contra o vínculo ativo do UID autenticado.
+    match /services/{id} {
+      allow read: if isAdmin() || isStoreMember(resource.data.storeId);
+      allow create, update: if isAdmin() && validStoreReference(request.resource.data.storeId);
+      allow delete: if isAdmin();
+    }
+    match /obras/{id} {
+      allow read: if isAdmin() || isStoreMember(resource.data.storeId);
+      allow create, update: if isAdmin() && validStoreReference(request.resource.data.storeId);
+      allow delete: if isAdmin();
+    }
+    match /visitas/{id} {
+      allow read: if isAdmin() || (resource.data.storeId is string && isStoreMember(resource.data.storeId));
+      // O cliente pode apenas criar uma solicitação vinculada a um estabelecimento
+      // ao qual já possui acesso aprovado. Agendamento, edição e exclusão continuam admin-only.
+      allow create: if (isAdmin() && validStoreReference(request.resource.data.storeId))
+        || (signedIn()
+          && request.resource.data.keys().hasOnly([
+            'id', 'storeId', 'clientName', 'clientDocument', 'clientPhone', 'address',
+            'date', 'time', 'purpose', 'technician', 'status', 'notificationTitle',
+            'notes', 'createdByUid', 'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.keys().hasAll([
+            'id', 'storeId', 'clientName', 'date', 'time', 'purpose', 'status',
+            'createdByUid', 'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.createdByUid == request.auth.uid
+          && request.resource.data.storeId is string
+          && isStoreMember(request.resource.data.storeId)
+          && request.resource.data.status == 'solicitada'
+          && request.resource.data.clientName is string
+          && request.resource.data.date is string
+          && request.resource.data.time is string
+          && request.resource.data.purpose in ['orcamento', 'vistoria_previa', 'acompanhamento', 'entrega_tecnica', 'emergencial']);
+      allow update: if isAdmin() && validStoreReference(request.resource.data.storeId);
+      allow delete: if isAdmin();
+    }
+
+    // Identidade visual pública do aplicativo: clientes autenticados podem ler o logo,
+    // mas somente o administrador verificado pode publicar ou substituir os arquivos.
+    match /publicAssets/{assetId} {
+      // O logo pode ser carregado antes do login (tela de inicialização).
+      // Metadados de APK continuam disponíveis somente para contas autenticadas.
+      allow get: if assetId == 'branding' || signedIn();
+      allow list: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Coleções globais, configurações, perfis, notificações e backups continuam admin-only.
+    match /settings/{id} { allow read, write: if isAdmin(); }
+    match /backups/{id} { allow read, write: if isAdmin(); }
+    match /userProfiles/{id} { allow read, write: if isAdmin(); }
+    match /notifications/{id} {
+      // Admin gerencia o histórico interno; clientes leem somente avisos do próprio estabelecimento.
+      allow read: if isAdmin()
+        || (signedIn()
+          && 'audience' in resource.data
+          && resource.data.audience == 'client'
+          && 'storeId' in resource.data
+          && resource.data.storeId is string
+          && isStoreMember(resource.data.storeId));
+      allow create, update, delete: if isAdmin();
+    }
+    match /notificationReads/{readId} {
+    allow read: if signedIn()
+      && resource.data.uid == request.auth.uid;
+
+    allow create, update: if signedIn()
+      && request.resource.data.keys().hasOnly([
+        'uid',
+        'notificationId',
+        'storeId',
+        'read',
+        'updatedAt'
+      ])
+      && request.resource.data.keys().hasAll([
+        'uid',
+        'notificationId',
+        'storeId',
+        'read',
+        'updatedAt'
+      ])
+      && request.resource.data.uid == request.auth.uid
+      && request.resource.data.notificationId is string
+      && request.resource.data.storeId is string
+      && request.resource.data.read == true
+      && request.resource.data.updatedAt is string
+      && readId == request.auth.uid + '__' + request.resource.data.notificationId
+      && isStoreMember(request.resource.data.storeId)
+      && exists(/databases/$(database)/documents/notifications/$(request.resource.data.notificationId))
+      && get(/databases/$(database)/documents/notifications/$(request.resource.data.notificationId)).data.audience == 'client'
+      && get(/databases/$(database)/documents/notifications/$(request.resource.data.notificationId)).data.storeId == request.resource.data.storeId;
+
+    allow delete: if signedIn()
+      && resource.data.uid == request.auth.uid
+      && isStoreMember(resource.data.storeId);
+  }
+  match /storage_backups/{id} { allow read, write: if isAdmin(); }
+    match /test/{id} { allow read, write: if isAdmin(); }
+  }
+}

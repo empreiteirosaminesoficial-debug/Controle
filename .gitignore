@@ -1,6 +1,7 @@
 node_modules/
 dist/
+server.js
+.vs/
+*.backup*
 .env
-.env.*
-!.env.example
-.DS_Store
+.env.local

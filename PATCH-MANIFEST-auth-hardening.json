@@ -1,0 +1,977 @@
+{
+  "date": "2026-11-23",
+  "scope": "bloqueio provisório e criação segura de solicitações de acesso; remoção da API WhatsApp e contato direto via wa.me; proteção do download do código-fonte; revogação de acesso validada também pelo status atual da solicitação; validação transacional de CPF único no vínculo de estabelecimento; correção de falso positivo no indicador de conexão Firestore; defesa em profundidade para impedir sincronização e backup global fora da sessão administrativa Firebase verificada",
+  "changes": [
+    {
+      "file": "src/utils/storage.ts",
+      "backup": "_backups/auth-hardening-20261123/src/utils/storage.ts",
+      "sha256_before": "4c84b41988fd32f0bd45bf5f5bbf7abec432ddf73bf22b04fd1b99cd0daf854a",
+      "sha256_backup": "4c84b41988fd32f0bd45bf5f5bbf7abec432ddf73bf22b04fd1b99cd0daf854a",
+      "sha256_after": "8ce8603a1ead0397209d7fa85401436005dedbfacca7567a540608826865e71b",
+      "verified_backup": true
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "backup": "_backups/auth-hardening-20261123/src/utils/googleAuthService.ts",
+      "sha256_before": "b8c3f4a8d8b05fbf8f0d448de2a0cbddcfcae4f88b63fc946309feeb5b5c159b",
+      "sha256_backup": "b8c3f4a8d8b05fbf8f0d448de2a0cbddcfcae4f88b63fc946309feeb5b5c159b",
+      "sha256_after": "21e082f363e19fa313d70bc3ae2ac2ef181caaff30627e0019a1d3e44796092d",
+      "verified_backup": true
+    },
+    {
+      "file": "src/components/AuthGate.tsx",
+      "backup": "_backups/auth-hardening-20261123/src/components/AuthGate.tsx",
+      "sha256_before": "971aeaf4a1573a6b162d057c90d230a9dcb3b16988ee82fc514d7f7461bda0e5",
+      "sha256_backup": "971aeaf4a1573a6b162d057c90d230a9dcb3b16988ee82fc514d7f7461bda0e5",
+      "sha256_after": "dcf11d8dbd99c45277f629db2403327d10891cb229094050ab76f5e7cca0e8b0",
+      "verified_backup": true
+    },
+    {
+      "file": "src/App.tsx",
+      "backup": "_backups/firebase-session-observer-20261123/src/App.tsx",
+      "sha256_before": "bb351266b97b7fb5635b9ab63bf945f6f0eeeb60b86f0912a963dd3b3f1de5c7",
+      "sha256_backup": "bb351266b97b7fb5635b9ab63bf945f6f0eeeb60b86f0912a963dd3b3f1de5c7",
+      "sha256_after": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4",
+      "verified_backup": true,
+      "description": "Sessão administrativa reconstruída pelo onAuthStateChanged do Firebase; clientes pendentes não recebem sessão; logout encerra Firebase Auth."
+    },
+    {
+      "file": "src/App.tsx",
+      "backup": "_backups/firebase-session-observer-20261123/src/App.tsx.stage2",
+      "sha256_before": "08f8296bfa7d546f18d44f1a04f674e3aa40633da98ac1c411f131a0af49d693",
+      "sha256_backup": "08f8296bfa7d546f18d44f1a04f674e3aa40633da98ac1c411f131a0af49d693",
+      "sha256_after": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4",
+      "verified_backup": true,
+      "description": "Remove loadUser from initial React state; require active admin role before global Firestore sync and global listeners."
+    },
+    {
+      "file": "src/App.tsx",
+      "backup": "_backups/firebase-session-observer-20261123/src/App.tsx.stage3",
+      "sha256_before": "13daadf63114aa807e2932e936281405193d6604b68f077c4926a13c6a6a3fea",
+      "sha256_backup": "13daadf63114aa807e2932e936281405193d6604b68f077c4926a13c6a6a3fea",
+      "sha256_after": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4",
+      "verified_backup": true,
+      "description": "Remove import of local loadUser; session source is exclusively Firebase Auth observer."
+    },
+    {
+      "file": "firestore.rules",
+      "backup": "_backups/access-requests-20261123/firestore.rules",
+      "sha256_before": "8c736200134875393599fdc2faefa18ac70490df460951c8853999cadd97e431",
+      "sha256_backup": "8c736200134875393599fdc2faefa18ac70490df460951c8853999cadd97e431",
+      "sha256_after": "47f0aeab32792c554a6569ef0379d291aead0956c31cb5e9886fff5f73a5af06",
+      "verified_backup": true,
+      "description": "Regras default deny para clientes; somente admin verificado acessa dados de negócio; usuário cria/lê apenas solicitação própria."
+    },
+    {
+      "file": "storage.rules",
+      "backup": "_backups/access-requests-20261123/storage.rules",
+      "sha256_before": "68f9ee8a84e26c4e0fe997dad533d6353287829f6871337092b7fa5d4e55b344",
+      "sha256_backup": "68f9ee8a84e26c4e0fe997dad533d6353287829f6871337092b7fa5d4e55b344",
+      "sha256_after": "0a74f255790f418caf06b2601c7584b012375497fef654ed8400688276dd19dc",
+      "verified_backup": true,
+      "description": "Backups no Storage restritos ao administrador Google com e-mail verificado."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "backup": "_backups/access-requests-20261123/src/utils/googleAuthService.ts",
+      "sha256_before": "74de23df31d80dda29d1b7037df6e7747559adbb73273a2928c19a7f8aeae446",
+      "sha256_backup": "74de23df31d80dda29d1b7037df6e7747559adbb73273a2928c19a7f8aeae446",
+      "sha256_after": "21e082f363e19fa313d70bc3ae2ac2ef181caaff30627e0019a1d3e44796092d",
+      "verified_backup": true,
+      "description": "Solicitação pendente criada uma vez por UID Firebase; cliente não escolhe status ou papel."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "backup": "_backups/access-requests-20261123/src/utils/googleAuthService.ts.stage2",
+      "sha256_before": "6f6db5571d28815011d5e348afbcb020f6f3df09f56bc6d5b795f58c0ac7593a",
+      "sha256_backup": "6f6db5571d28815011d5e348afbcb020f6f3df09f56bc6d5b795f58c0ac7593a",
+      "sha256_after": "21e082f363e19fa313d70bc3ae2ac2ef181caaff30627e0019a1d3e44796092d",
+      "verified_backup": true,
+      "description": "Criação idempotente e transacional da solicitação por UID, evitando corrida entre o observador Firebase e a tela de login."
+    },
+    {
+      "file": "server.ts",
+      "backup": "_backups/whatsapp-direct-contact-20261123/server.ts",
+      "sha256_before": "a3002bea8ba4ce7fefa4dc80884067acc1677bb517a22060a2e708731e995c78",
+      "sha256_backup": "a3002bea8ba4ce7fefa4dc80884067acc1677bb517a22060a2e708731e995c78",
+      "verified_backup": true,
+      "sha256_after": "551ec3de5e443968c4ac7adc3dd6e285c9518a1df8493da17f83e5e1a3e6e284"
+    },
+    {
+      "file": "src/App.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/App.tsx",
+      "sha256_before": "205e65c1ce7150eaeda6d11b671016f9dc97e386312c24661aaefd29cd0319c9",
+      "sha256_backup": "205e65c1ce7150eaeda6d11b671016f9dc97e386312c24661aaefd29cd0319c9",
+      "verified_backup": true,
+      "sha256_after": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4"
+    },
+    {
+      "file": "src/types.ts",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/types.ts",
+      "sha256_before": "3ef28233213e319fb9e89d0be785bd9a82f13b8bf299a2060d880dbac468c3d1",
+      "sha256_backup": "3ef28233213e319fb9e89d0be785bd9a82f13b8bf299a2060d880dbac468c3d1",
+      "verified_backup": true,
+      "sha256_after": "f4554e5c4af8deef86fd098627140c5677a8a69117919f9f2c07341f3993438b"
+    },
+    {
+      "file": "src/components/Navbar.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/Navbar.tsx",
+      "sha256_before": "ab947466f30aa73221a03f487b436ae97fff5318f994437aa894dc2b97d025a1",
+      "sha256_backup": "ab947466f30aa73221a03f487b436ae97fff5318f994437aa894dc2b97d025a1",
+      "verified_backup": true,
+      "sha256_after": "9c3131cfabb4428855fbe4aab370948dd986c8583809ff10236c46f640bb0d1a"
+    },
+    {
+      "file": "src/components/pages/ConfiguracaoPage.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/pages/ConfiguracaoPage.tsx",
+      "sha256_before": "b87d3a2dd0fe5b6518e0324caa78a2272d40c102a56b66ba71ce932c6fa54cff",
+      "sha256_backup": "b87d3a2dd0fe5b6518e0324caa78a2272d40c102a56b66ba71ce932c6fa54cff",
+      "verified_backup": true,
+      "sha256_after": "5d872a063feed3e15050a1961be2b2a666fd8f3ab780d27f87b9f339bf571486"
+    },
+    {
+      "file": "src/utils/whatsappStorage.ts",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/utils/whatsappStorage.ts",
+      "sha256_before": "68ad6726904a54dacbbb8aae57591e3144c610f72f724e1ff503c102368501ba",
+      "sha256_backup": "68ad6726904a54dacbbb8aae57591e3144c610f72f724e1ff503c102368501ba",
+      "verified_backup": true,
+      "sha256_after": "12a5665f5fc8c2b1b73bfc789ea9e14266129c2ac17a22cc0e21ef0aa1d0f8c9"
+    },
+    {
+      "file": "src/utils/whatsappSender.ts",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/utils/whatsappSender.ts",
+      "sha256_before": "9e4ea3d6d9dd3111a4817a53945ab48aa446d587a883b57d22ad98db8b26b96b",
+      "sha256_backup": "9e4ea3d6d9dd3111a4817a53945ab48aa446d587a883b57d22ad98db8b26b96b",
+      "verified_backup": true,
+      "sha256_after": "927cb4ac69712bb5a746200b4e0a452dc4bd02038edb3f1eb129e2b5a8cc3948"
+    },
+    {
+      "file": "src/components/WhatsAppSettingsModal.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/WhatsAppSettingsModal.tsx",
+      "sha256_before": "c631cdab2de69677a5e38f3f53bfa6e4f7599132e518da5a0e63995a754376b3",
+      "sha256_backup": "c631cdab2de69677a5e38f3f53bfa6e4f7599132e518da5a0e63995a754376b3",
+      "verified_backup": true,
+      "deleted": true,
+      "sha256_after": null
+    },
+    {
+      "file": "src/App.tsx",
+      "description": "Botão flutuante fixo para o WhatsApp informado pelo usuário: +55 61 3142-1406."
+    },
+    {
+      "file": "src/components/pages/ObrasPage.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/pages/ObrasPage.tsx",
+      "sha256_before": "2c3bcffb4a21e6ddd6342c005249b12acd51633e4eab359175dc2c335c845080",
+      "sha256_backup": "2c3bcffb4a21e6ddd6342c005249b12acd51633e4eab359175dc2c335c845080",
+      "verified_backup": true,
+      "description": "Remove dependência de configuração/API; mantém abertura manual de mensagens no WhatsApp do cliente.",
+      "sha256_after": "7874466803049e7eee96dd29cf0f9fe8ed8e3f407e87fb8d91ef184daa1c9f58"
+    },
+    {
+      "file": "src/components/pages/VisitasPage.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/pages/VisitasPage.tsx",
+      "sha256_before": "2da4933fd23b6ac79312aa09d1eaa8b8bf21aa41851c6af3ed0680cd7a16dc97",
+      "sha256_backup": "2da4933fd23b6ac79312aa09d1eaa8b8bf21aa41851c6af3ed0680cd7a16dc97",
+      "verified_backup": true,
+      "description": "Remove dependência de configuração/API; mantém abertura manual de mensagens no WhatsApp do cliente.",
+      "sha256_after": "f6841c8d45237b6c0d4b3c2fb7a5895a0a5e638ea5cdc03da2ae353dfe2f5f75"
+    },
+    {
+      "file": "src/components/NotificationCenterModal.tsx",
+      "backup": "_backups/whatsapp-direct-contact-20261123/src/components/NotificationCenterModal.tsx",
+      "sha256_before": "398e668703e6ac703ef535311f80c5aa138f89dba1f1efdbebf2d502cc8a9515",
+      "sha256_backup": "398e668703e6ac703ef535311f80c5aa138f89dba1f1efdbebf2d502cc8a9515",
+      "sha256_after": "5fc203ceec53a30684f9b130109378b9cd0dcf77290559e424e1000eb4a9078e",
+      "verified_backup": true,
+      "description": "Padroniza link de envio manual de lembrete PIX para wa.me; não usa API de mensagens."
+    },
+    {
+      "file": "server.ts",
+      "backup": "_backups/source-download-admin-only-20261123/server.ts",
+      "sha256_before": "551ec3de5e443968c4ac7adc3dd6e285c9518a1df8493da17f83e5e1a3e6e284",
+      "sha256_backup": "551ec3de5e443968c4ac7adc3dd6e285c9518a1df8493da17f83e5e1a3e6e284",
+      "sha256_after": "017c0d8ee0bc2c8821ef9e6947593bab62b3d0a04114c91118cee27096adb847",
+      "verified_backup": true,
+      "description": "Download do código-fonte restrito ao administrador no servidor e na interface."
+    },
+    {
+      "file": "src/components/Navbar.tsx",
+      "backup": "_backups/source-download-admin-only-20261123/src/components/Navbar.tsx",
+      "sha256_before": "9c3131cfabb4428855fbe4aab370948dd986c8583809ff10236c46f640bb0d1a",
+      "sha256_backup": "9c3131cfabb4428855fbe4aab370948dd986c8583809ff10236c46f640bb0d1a",
+      "sha256_after": "d6cc6c245fed11297409107a39a2da57897c138a5132860d723deb8a2dcef76e",
+      "verified_backup": true,
+      "description": "Download do código-fonte restrito ao administrador no servidor e na interface."
+    },
+    {
+      "file": "firestore.rules",
+      "backup": "_backups/request-status-membership-20261123/firestore.rules",
+      "sha256_before": "47f0aeab32792c554a6569ef0379d291aead0956c31cb5e9886fff5f73a5af06",
+      "sha256_backup": "47f0aeab32792c554a6569ef0379d291aead0956c31cb5e9886fff5f73a5af06",
+      "sha256_after": "83a67c442d7128b9b43c04a82a0276d8036a699ee4ed7eb6659de019b4ac1b8b",
+      "verified_backup": true,
+      "description": "Defesa em profundidade: regras só reconhecem membership se a solicitação do UID continuar aprovada e incluir o storeId."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "backup": "_backups/cpf-transaction-validation-20261123/src/components/AccessRequestsManager.tsx",
+      "sha256_before": "16c512bbb65c4710d76abb2d0a6a0a2c29d5ac237e8792a7473a7dd0d4be3d71",
+      "sha256_backup": "16c512bbb65c4710d76abb2d0a6a0a2c29d5ac237e8792a7473a7dd0d4be3d71",
+      "sha256_after": "0209458a1ee1233a0b6278c5bbab62cdb2c791e8828d879bcab6c870e4754853",
+      "verified_backup": true,
+      "description": "Validação transacional do CPF único: reconsulta os estabelecimentos atuais e bloqueia segundo CPF mesmo com lista de tela desatualizada."
+    },
+    {
+      "file": "firestore.rules",
+      "backup": "_backups/store-status-legacy-compat-20261123/firestore.rules",
+      "sha256_before": "83a67c442d7128b9b43c04a82a0276d8036a699ee4ed7eb6659de019b4ac1b8b",
+      "sha256_backup": "83a67c442d7128b9b43c04a82a0276d8036a699ee4ed7eb6659de019b4ac1b8b",
+      "sha256_after": "43bc2554719d1bc60670c898eceec237e4fd1d645ba1e62586c19d6f69bbf96c",
+      "verified_backup": true,
+      "description": "Compatibilidade segura para estabelecimentos legados sem campo status e validação de UID/storeId no documento de membership."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "fail-closed-client-authorization-20261123",
+      "backup": "_backups/fail-closed-client-auth-20261123/src/utils/cloudDatabase.ts",
+      "sha256_before": "3b99b6cf079810597cbdf64e8f49666f0e9192e0221f771c54397acaa51df3c1",
+      "sha256_backup": "3b99b6cf079810597cbdf64e8f49666f0e9192e0221f771c54397acaa51df3c1",
+      "sha256_after": "88afc163e51650ddc59401fb6b72ed6540f4d8c21f4f9e03a9c2b908912dbe84",
+      "verified_backup": true,
+      "description": "Dados de clientes carregados somente por leituras Firestore do servidor; falhas de consulta deixam de ser convertidas em listas vazias; erro nos listeners de vínculo/estabelecimento falha fechado."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "fail-closed-client-authorization-20261123",
+      "backup": "_backups/fail-closed-client-auth-20261123/src/App.tsx",
+      "sha256_before": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4",
+      "sha256_backup": "bd6d8ce05d25d17ced51694b7b9c9958fd65ecf00650e7581f843f4ff2d307b4",
+      "sha256_after": "1b4514f7a4079d080a254c85bd52de4a33e7fa5e50d86e6cb9b2fed45e44a8eb",
+      "verified_backup": true,
+      "description": "Oculta os dados do cliente em perda de conexão ou falha de validação; revalida ao reconectar."
+    },
+    {
+      "file": "README.md",
+      "stage": "fail-closed-client-authorization-20261123",
+      "backup": "_backups/fail-closed-client-auth-20261123/README.md",
+      "sha256_before": "27f741b5357806f951663f5525488d8c405ef25c80b74895b964e3103676dd36",
+      "sha256_backup": "27f741b5357806f951663f5525488d8c405ef25c80b74895b964e3103676dd36",
+      "sha256_after": "0af6ea226a65ce12f6599ffc90e2855de864214e05b8cda354e00b8539942ef8",
+      "verified_backup": true,
+      "description": "Corrige documentação que dizia incorretamente que toda conta autenticada acessava os registros; documenta aprovação e vínculo por estabelecimento."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "backup": "_backups/cloud-status-server-check-20261123/src/utils/cloudDatabase.ts",
+      "sha256_before": "88afc163e51650ddc59401fb6b72ed6540f4d8c21f4f9e03a9c2b908912dbe84",
+      "sha256_backup": "88afc163e51650ddc59401fb6b72ed6540f4d8c21f4f9e03a9c2b908912dbe84",
+      "sha256_after": "f1d38700790a9959f663d72773a1cff0ef237a03bdf6457c6821842c33cc0a73",
+      "verified_backup": true,
+      "description": "Falha/timeout na leitura getDocFromServer agora marca Firestore como desconectado, sem retornar status positivo por erro ignorado."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "backup": "_backups/client-membership-listeners-20261123/src/utils/cloudDatabase.ts",
+      "sha256_before": "f1d38700790a9959f663d72773a1cff0ef237a03bdf6457c6821842c33cc0a73",
+      "sha256_backup": "f1d38700790a9959f663d72773a1cff0ef237a03bdf6457c6821842c33cc0a73",
+      "sha256_after": "ff7da9f868906f9d3872300cf1b2ac5c97b712775077dfdea4395b8c8ab9bbe0",
+      "verified_backup": true,
+      "description": "Ouvintes de autorização reconciliados dinamicamente para novos/removidos estabelecimentos; falha fechada em remoção, bloqueio ou erro de leitura."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "backup": "_backups/client-membership-listeners-20261123-v2/src/utils/cloudDatabase.ts",
+      "sha256_before": "ff7da9f868906f9d3872300cf1b2ac5c97b712775077dfdea4395b8c8ab9bbe0",
+      "sha256_backup": "ff7da9f868906f9d3872300cf1b2ac5c97b712775077dfdea4395b8c8ab9bbe0",
+      "sha256_after": "940c717f7c5060df6b27eef689a115a12473ceb00e2c09ed5f97103437b6a9bf",
+      "verified_backup": true,
+      "description": "Evita callbacks de autorização em snapshots iniciais válidos; só mudanças relevantes posteriores renovam a validação, evitando ciclo de re-render/subscrição."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "backup": "_backups/defense-in-depth-admin-guards-20261123/src/utils/cloudDatabase.ts",
+      "sha256_before": "940c717f7c5060df6b27eef689a115a12473ceb00e2c09ed5f97103437b6a9bf",
+      "sha256_backup": "940c717f7c5060df6b27eef689a115a12473ceb00e2c09ed5f97103437b6a9bf",
+      "sha256_after": "6af83a74e734225edb05271036625d5fb7139d71159ce7da55e9339a3a7f412e",
+      "verified_backup": true,
+      "description": "Bloqueia a sincronização/backup global antes de ler dados locais, exceto para sessão Firebase do administrador com e-mail verificado."
+    },
+    {
+      "file": "src/utils/firebaseStorageBackup.ts",
+      "backup": "_backups/defense-in-depth-admin-guards-20261123/src/utils/firebaseStorageBackup.ts",
+      "sha256_before": "7559aea7536338d44edffd2b14c9e0ac1cefae1a7b770030a266d094d31395f9",
+      "sha256_backup": "7559aea7536338d44edffd2b14c9e0ac1cefae1a7b770030a266d094d31395f9",
+      "sha256_after": "c83ad9523c2e70ffd50b421da1175ef0e0e6430ed88128a15498bc9ab7a9f181",
+      "verified_backup": true,
+      "description": "Bloqueia a sincronização/backup global antes de ler dados locais, exceto para sessão Firebase do administrador com e-mail verificado."
+    }
+  ],
+  "limitations": [
+    "Solicitações de acesso ainda não são gravadas em backend seguro.",
+    "Clientes permanecem sem acesso até implementar aprovação por UID e isolamento por estabelecimento.",
+    "Regras remotas do Firebase não foram alteradas.",
+    "Build e testes não foram executados.",
+    "As regras Firestore ainda não foram executadas no Firebase Emulator; a validação desta etapa é estática e não substitui testes de autorização reais.",
+    "O histórico do manifesto contém dois registros antigos sem metadados completos de backup; os backups referenciados nos demais registros foram conferidos por SHA-256. O patch mais recente possui backup verificado."
+  ],
+  "validation": {
+    "status": "static-only",
+    "typescript_syntax": {
+      "files": 63,
+      "errors": 0,
+      "method": "TypeScript transpileModule"
+    },
+    "firestore_rules_static": {
+      "delimiter_balance": "passed",
+      "membership_guards": "passed",
+      "emulator": "not_run"
+    },
+    "zip_integrity": "passed",
+    "firebase_emulator": "not_run",
+    "build": "not_run",
+    "full_typecheck": "not_run",
+    "reason": "Dependências do projeto não estão instaladas no ambiente. Testes de integração e Emulator ainda são necessários."
+  },
+  "patches": [
+    {
+      "file": "src/App.tsx",
+      "stage": "auth-race-drive-20261123",
+      "backup": "_backups/auth-race-drive-20261123/src/App.tsx",
+      "before_sha256": "a668268a2c7b660dd7106808fcebced0181e1195a8ba34957f3513ee69db57a1",
+      "after_sha256": "00767815d3c7a24fed4e45a417c01a4ee3e91bef0f3e31ef1deaafc95d7f0943",
+      "description": "Revoga sessão anterior imediatamente e protege concorrência de eventos Firebase."
+    },
+    {
+      "file": "src/lib/firebase.ts",
+      "stage": "auth-race-drive-20261123",
+      "backup": "_backups/auth-race-drive-20261123/src/lib/firebase.ts",
+      "before_sha256": "ac65187d3eff531a13c887349475f5cc018aeaf69085b13b948937c510ea6c1d",
+      "after_sha256": "b0e362a93338c24c74e335519802e4d67bfdd158a61847bba963999090a5a7c1",
+      "description": "Usa reautenticação da conta Firebase atual para Drive e vincula token ao UID."
+    },
+    {
+      "file": "server.ts",
+      "stage": "server-api-auth-20261123",
+      "backup": "_backups/server-api-auth-20261123/server.ts",
+      "before_sha256": "a4e39969cf870e62edc1d7c77b98fc9b7e1f3ac6102dd1064dee8784b87cbd8a",
+      "after_sha256": "f1f89f2f1e6a888bcb51327d43d77446f9ec9c0dd54dc58d63b47379f6162fbc",
+      "description": "Exige token Firebase válido e e-mail administrativo verificado nas rotas WhatsApp e upload de logo."
+    },
+    {
+      "file": "src/lib/firebase.ts",
+      "stage": "server-api-auth-20261123",
+      "backup": "_backups/server-api-auth-20261123/src/lib/firebase.ts",
+      "before_sha256": "b0e362a93338c24c74e335519802e4d67bfdd158a61847bba963999090a5a7c1",
+      "after_sha256": "86141061254fba2a50f70c2f200ee3a14cbb7a37f8863c33aa485688f853b387",
+      "description": "Envia token Firebase Bearer para as rotas administrativas do servidor."
+    },
+    {
+      "file": "src/utils/logoManager.ts",
+      "stage": "server-api-auth-20261123",
+      "backup": "_backups/server-api-auth-20261123/src/utils/logoManager.ts",
+      "before_sha256": "6d01a302aae277f21f758d1ca4690dfd32d4e1287299ec09e96b2b9e462e677c",
+      "after_sha256": "5b6f75a8a63a0acf71c0bbe576bfacfc9594bbb5b04f3b421eb8e015b7878498",
+      "description": "Envia token Firebase Bearer para as rotas administrativas do servidor."
+    },
+    {
+      "file": "src/utils/whatsappSender.ts",
+      "stage": "server-api-auth-20261123",
+      "backup": "_backups/server-api-auth-20261123/src/utils/whatsappSender.ts",
+      "before_sha256": "3a0b8c441e1e72477c3e84a55157c960bdb5c5548a35f5790eb820716e34691b",
+      "after_sha256": "9e4ea3d6d9dd3111a4817a53945ab48aa446d587a883b57d22ad98db8b26b96b",
+      "description": "Envia token Firebase Bearer para as rotas administrativas do servidor."
+    },
+    {
+      "file": "src/components/WhatsAppSettingsModal.tsx",
+      "stage": "server-api-auth-20261123",
+      "backup": "_backups/server-api-auth-20261123/src/components/WhatsAppSettingsModal.tsx",
+      "before_sha256": "c8a197460bd096feefd24dac03556b9432c71355e646b11c4d795a2bc2be9b08",
+      "after_sha256": "c631cdab2de69677a5e38f3f53bfa6e4f7599132e518da5a0e63995a754376b3",
+      "description": "Envia token Firebase Bearer para as rotas administrativas do servidor."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "remove-impersonation-20261123",
+      "backup": "_backups/remove-impersonation-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "ff1c8f05e47f5bfb76e23debce52410a831da9a6d73e716a73ab43a6a21338e2",
+      "after_sha256": "30d873fde8cad79bd697eaa8e7c6b3fc384ae332bfd2eea371271a4d6b5b2bd6",
+      "description": "Remove troca/impersonação local de perfis, login Google alternativo no modal, criação de contas com papel arbitrário e retorno para administrador simulado."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "remove-fake-admin-20261123",
+      "backup": "_backups/remove-fake-admin-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "30d873fde8cad79bd697eaa8e7c6b3fc384ae332bfd2eea371271a4d6b5b2bd6",
+      "after_sha256": "ad2ff8a32a92211b4edc383957ca9f63caa383404e504d7e4622bec936779499",
+      "description": "Remove perfis administrativos simulados e função antiga de reset que recriava administrador fictício."
+    },
+    {
+      "file": "src/utils/storage.ts",
+      "stage": "remove-fake-admin-20261123",
+      "backup": "_backups/remove-fake-admin-20261123/src/utils/storage.ts",
+      "before_sha256": "021c69ca3da39b5d01679709563829bb0aa4dc2550a9b4442730ae8defe1769a",
+      "after_sha256": "e431d61b38f4bf28ead843fd1046408b263365a1bb81cd9d16cb78b84f616ca6",
+      "description": "Remove perfis administrativos simulados e função antiga de reset que recriava administrador fictício."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "fix-jsx-tsconfig-20261123",
+      "backup": "_backups/fix-jsx-tsconfig-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "ad2ff8a32a92211b4edc383957ca9f63caa383404e504d7e4622bec936779499",
+      "after_sha256": "3428422de75b5c1d3b1dbf2fae439f85f85920b34c9d07075eab83ab915e55f3",
+      "description": "Corrige fechamento JSX após remoção da troca de perfis e exclui backups do escopo de compilação TypeScript."
+    },
+    {
+      "file": "tsconfig.json",
+      "stage": "fix-jsx-tsconfig-20261123",
+      "backup": "_backups/fix-jsx-tsconfig-20261123/tsconfig.json",
+      "before_sha256": "2b893970339198d2ed64568693c856845bf48c578f87e1f76b318b407a8b6599",
+      "after_sha256": "e2a69cd146ba4608b83e4b3b038e0f15e43c9e2a84127316659f0285f6c7c68d",
+      "description": "Corrige fechamento JSX após remoção da troca de perfis e exclui backups do escopo de compilação TypeScript."
+    },
+    {
+      "file": "src/components/AuthGate.tsx",
+      "stage": "authgate-google-only-20261123",
+      "backup": "_backups/authgate-google-only-20261123/src/components/AuthGate.tsx",
+      "before_sha256": "e84eec8ad3f6b684f0efc30b99826ad97dc9d4860b61cb76eed264b15dc68221",
+      "after_sha256": "e8ee0618861c74f93e0c50851d9b78a0364fe034887477707413eded5c118b7e",
+      "description": "Remove formulários de login/cadastro por CPF/CNPJ/e-mail, vínculo documental local e campos PIN; mantém somente autenticação Google e aviso de aprovação."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "stage": "verified-email-pin-20261123",
+      "backup": "_backups/verified-email-pin-20261123/src/utils/googleAuthService.ts",
+      "before_sha256": "65b4599326cbdd4e522e480648e6007cee38a7e843d3e62efb4913f17e52bd57",
+      "after_sha256": "85d2e7ed31536d1fdc28fdad645eca6a8056e117dae97228c2cfb230b3cc9202",
+      "description": "Exige e-mail Google verificado para clientes e remove armazenamento de PIN local desativado."
+    },
+    {
+      "file": "firestore.rules",
+      "stage": "verified-email-pin-20261123",
+      "backup": "_backups/verified-email-pin-20261123/firestore.rules",
+      "before_sha256": "ee9bb3d58c5f34aa0b3e525a47fc3146760dd9836db8156125d425ac4df8d60b",
+      "after_sha256": "f6b3f35cd5686c5076b4d75a35ec8cda83d4ce781dca31f6abbd2d6acce2693a",
+      "description": "Exige e-mail Google verificado para clientes e remove armazenamento de PIN local desativado."
+    },
+    {
+      "file": "src/utils/storage.ts",
+      "stage": "verified-email-pin-20261123",
+      "backup": "_backups/verified-email-pin-20261123/src/utils/storage.ts",
+      "before_sha256": "e431d61b38f4bf28ead843fd1046408b263365a1bb81cd9d16cb78b84f616ca6",
+      "after_sha256": "eb8343174b7289bf497471c5b471f2c721dd510768a685fefb6a33f6fc169a7e",
+      "description": "Exige e-mail Google verificado para clientes e remove armazenamento de PIN local desativado."
+    },
+    {
+      "file": "src/components/AuthGate.tsx",
+      "stage": "authgate-cleanup-20261123",
+      "backup": "_backups/authgate-cleanup-20261123/src/components/AuthGate.tsx",
+      "before_sha256": "e8ee0618861c74f93e0c50851d9b78a0364fe034887477707413eded5c118b7e",
+      "after_sha256": "7e20df0e0bfc526bad6f7d34776f81d2d8effd7ddb8917f411a2db2b5793a56e",
+      "description": "Remove estados antigos de login documental e corrige apresentação dos erros nas duas abas Google."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "logout-cross-tab-20261123",
+      "backup": "_backups/logout-cross-tab-20261123/src/App.tsx",
+      "before_sha256": "00767815d3c7a24fed4e45a417c01a4ee3e91bef0f3e31ef1deaafc95d7f0943",
+      "after_sha256": "737f74c792aea26e881bec0cbfef60527f121cbce2be4565fe329281491943d5",
+      "description": "Faz logout do Firebase no comando de encerramento e evita invalidar a sessão local em simples sincronização entre abas."
+    },
+    {
+      "file": "src/utils/storage.ts",
+      "stage": "remove-legacy-profile-creation-20261123",
+      "backup": "_backups/remove-legacy-profile-creation-20261123/src/utils/storage.ts",
+      "before_sha256": "eb8343174b7289bf497471c5b471f2c721dd510768a685fefb6a33f6fc169a7e",
+      "after_sha256": "8ce8603a1ead0397209d7fa85401436005dedbfacca7567a540608826865e71b",
+      "description": "Remove fábrica local de perfis com papel/status escolhidos por dados locais e vínculo documental que podia confundir com autorização."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "remove-legacy-profile-creation-20261123",
+      "backup": "_backups/remove-legacy-profile-creation-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "3428422de75b5c1d3b1dbf2fae439f85f85920b34c9d07075eab83ab915e55f3",
+      "after_sha256": "d224a531d09a7bb0297477963bf89b9e22aa0ff96eac85c1ca8b7814c7e54927",
+      "description": "Remove fábrica local de perfis com papel/status escolhidos por dados locais e vínculo documental que podia confundir com autorização."
+    },
+    {
+      "file": "storage.rules",
+      "stage": "storage-limits-20261123",
+      "backup": "_backups/storage-limits-20261123/storage.rules",
+      "before_sha256": "80984e6b4f9e9b2f4304c70bc3509b4895e4c908e562a2806e14b07e5c1b689d",
+      "after_sha256": "0a74f255790f418caf06b2601c7584b012375497fef654ed8400688276dd19dc",
+      "description": "Mantém Storage restrito ao administrador e preserva limite de 100 MB e tipo gzip para backups."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "legacy-profile-ui-clarification-20261123",
+      "backup": "_backups/legacy-profile-ui-clarification-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "d224a531d09a7bb0297477963bf89b9e22aa0ff96eac85c1ca8b7814c7e54927",
+      "after_sha256": "80c26ba365bef7ebdacf2c3f02f3a64fbde05c3c00fe9e2cf28c7d6b2997cfc3",
+      "description": "Corrige textos da interface para deixar explícito que status e vínculos legados não concedem autorização Firestore."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "logout-error-handling-20261123",
+      "backup": "_backups/logout-error-handling-20261123/src/App.tsx",
+      "before_sha256": "737f74c792aea26e881bec0cbfef60527f121cbce2be4565fe329281491943d5",
+      "after_sha256": "a091ff541dc7cd2d9c1d66e41ab56e239b8502389c124b72682077039f69567b",
+      "description": "Trata falhas assíncronas de signOut Firebase sem gerar rejeições não tratadas."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "session-data-isolation-20261123",
+      "backup": "_backups/session-data-isolation-20261123/src/App.tsx",
+      "before_sha256": "a091ff541dc7cd2d9c1d66e41ab56e239b8502389c124b72682077039f69567b",
+      "after_sha256": "70ff10e108c8134b9b19c07f212ef69e648f4ea541558a68ddbf922228265a63",
+      "description": "Evita carregar cache empresarial antes da autenticação; limpa dados em memória ao trocar/sair de conta e restringe persistência/cross-tab ao administrador verificado."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "async-session-races-20261123",
+      "backup": "_backups/async-session-races-20261123/src/App.tsx",
+      "before_sha256": "70ff10e108c8134b9b19c07f212ef69e648f4ea541558a68ddbf922228265a63",
+      "after_sha256": "89bceb05095a029485ac250f6e3138c1ba7e43d63013a1207c15f6ff9faa23d4",
+      "description": "Impede que sincronizações/listeners atrasados restaurem usuário após logout e impede dados remotos de sobrescrever role/status definidos pelo Firebase Auth."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "profile-role-trust-20261123",
+      "backup": "_backups/profile-role-trust-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "80c26ba365bef7ebdacf2c3f02f3a64fbde05c3c00fe9e2cf28c7d6b2997cfc3",
+      "after_sha256": "924f9fae8bd4e1eaa2b340217a105edaf63276b8f451d604b1348eecc34b7f23",
+      "description": "Impede que a lista local de perfis sobrescreva o usuário autenticado e remove estados órfãos de criação/troca de conta."
+    },
+    {
+      "file": "src/components/AuthGate.tsx",
+      "stage": "authgate-identity-match-20261123",
+      "backup": "_backups/authgate-identity-match-20261123/src/components/AuthGate.tsx",
+      "before_sha256": "7e20df0e0bfc526bad6f7d34776f81d2d8effd7ddb8917f411a2db2b5793a56e",
+      "after_sha256": "cdc4b3d3456a092a2b96cfa4f6295a5dcc81519b9f8458826b0f86e392184f32",
+      "description": "Confere UID/e-mail da sessão Firebase atual com o perfil retornado antes de aceitar login, inclusive no retorno redirect."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "authgate-identity-match-20261123",
+      "backup": "_backups/authgate-identity-match-20261123/src/App.tsx",
+      "before_sha256": "89bceb05095a029485ac250f6e3138c1ba7e43d63013a1207c15f6ff9faa23d4",
+      "after_sha256": "96eb470809df5081d7b7f7d6d67d58e649acb860cc22e4ac2a450833e59701a9",
+      "description": "Confere UID/e-mail da sessão Firebase atual com o perfil retornado antes de aceitar login, inclusive no retorno redirect."
+    },
+    {
+      "file": "src/components/pages/ClientesPage.tsx",
+      "stage": "admin-access-requests-20261123",
+      "backup": "_backups/admin-access-requests-20261123/src/components/pages/ClientesPage.tsx",
+      "before_sha256": "56f18a90decf40fe6103a1cb94a433203c7c6c4a45c79b761d25947abb6e93fd",
+      "after_sha256": "628a293a07773275656157e52ec1247803ded90d784c99e14bde280cbf39578a",
+      "description": "Adiciona painel administrativo de solicitações com rejeição e aprovação somente após vínculo explícito a um estabelecimento existente; grava membership por UID e storeId."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "stage": "admin-access-requests-20261123",
+      "backup": null,
+      "before_sha256": null,
+      "after_sha256": "dd28f4bfb243397c1a861b11ba73e36af065eb86f3a2f2df611e703e67d1806d",
+      "description": "Novo painel admin para listar solicitações, rejeitar e vincular um ou vários estabelecimentos por usuário; aprovação exige seleção explícita de cadastro existente."
+    },
+    {
+      "file": "firestore.rules",
+      "stage": "store-membership-auth-rules-20261123",
+      "backup": "_backups/store-membership-auth-rules-20261123/firestore.rules",
+      "before_sha256": "f6b3f35cd5686c5076b4d75a35ec8cda83d4ce781dca31f6abbd2d6acce2693a",
+      "after_sha256": "b34937c10ba26c65fbe2381f3b3deefbcb4855489c96e2e89dfe907dc9ac9fda",
+      "description": "Permite leitura somente dos documentos vinculados a membership ativo; gravação continua administrativa; aprovação e membership controlados pelo admin."
+    },
+    {
+      "file": "src/types.ts",
+      "stage": "store-membership-auth-rules-20261123",
+      "backup": "_backups/store-membership-auth-rules-20261123/src/types.ts",
+      "before_sha256": "3cefae20df230a84d730a0d2cc443e9955f2a308c422c48fc9d70529f5e9ad0d",
+      "after_sha256": "3ef28233213e319fb9e89d0be785bd9a82f13b8bf299a2060d880dbac468c3d1",
+      "description": "Adiciona authorizedStoreIds ao perfil para representar vínculos explícitos aprovados."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "stage": "store-membership-auth-rules-20261123",
+      "backup": "_backups/store-membership-auth-rules-20261123/src/utils/googleAuthService.ts",
+      "before_sha256": "85d2e7ed31536d1fdc28fdad645eca6a8056e117dae97228c2cfb230b3cc9202",
+      "after_sha256": "c160478420ad3b22c595ac0161d36d81111bc1e5764576ce8cdd562482520073",
+      "description": "Reconstrói sessão cliente somente quando accessRequests registra status approved e lista de storeIds; pending/rejected não recebem acesso."
+    },
+    {
+      "file": "src/components/AuthGate.tsx",
+      "stage": "store-membership-auth-rules-20261123",
+      "backup": "_backups/store-membership-auth-rules-20261123/src/components/AuthGate.tsx",
+      "before_sha256": "cdc4b3d3456a092a2b96cfa4f6295a5dcc81519b9f8458826b0f86e392184f32",
+      "after_sha256": "dcf11d8dbd99c45277f629db2403327d10891cb229094050ab76f5e7cca0e8b0",
+      "description": "Aceita cliente apenas com aprovação ativa e pelo menos um storeId explicitamente autorizado."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "approved-client-data-isolation-20261123",
+      "backup": "_backups/approved-client-data-isolation-20261123/src/utils/cloudDatabase.ts",
+      "before_sha256": "3eb7201e893199d30a10471b4957d856b3d6fa3f6315030c17cac23ddd746550",
+      "after_sha256": "3c370ed1184a03a925ba4120f215931fa93aa0cfb53068e8c74f385dc2b7e798",
+      "description": "Adiciona carga remota filtrada por storeId aprovado, sem usar cache local global do administrador."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "approved-client-data-isolation-20261123",
+      "backup": "_backups/approved-client-data-isolation-20261123/src/App.tsx",
+      "before_sha256": "96eb470809df5081d7b7f7d6d67d58e649acb860cc22e4ac2a450833e59701a9",
+      "after_sha256": "8e4da37182d0f5e083d64c43c3d21466639b011fd69f0e71008fb3a5ad308e6b",
+      "description": "Reconstrói sessão cliente somente com vínculos aprovados, carrega lojas/serviços/obras/visitas por storeId e remove filtros por e-mail/documento que não provam autorização; bloqueia mutações de cliente."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "stage": "approved-client-data-isolation-20261123",
+      "backup": "_backups/approved-client-data-isolation-20261123/src/components/pages/AccessRequestsManager.tsx",
+      "before_sha256": "dd28f4bfb243397c1a861b11ba73e36af065eb86f3a2f2df611e703e67d1806d",
+      "after_sha256": "1b9e10d471f218dc1c5e8753ce99d35aa90586a5f098307d5fd6d331d08b0504",
+      "description": "Remove imports não utilizados do painel de solicitações."
+    },
+    {
+      "file": "firestore.rules",
+      "stage": "membership-approval-safety-20261123",
+      "backup": "_backups/membership-approval-safety-20261123/firestore.rules",
+      "before_sha256": "b34937c10ba26c65fbe2381f3b3deefbcb4855489c96e2e89dfe907dc9ac9fda",
+      "after_sha256": "7c303c9cfd8ffbb2e9dbeb8e4accffc07aebc6e79c06852bd49cf0e717030c4c",
+      "description": "Vínculo ativo não concede leitura de estabelecimento bloqueado."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "stage": "membership-approval-safety-20261123",
+      "backup": "_backups/membership-approval-safety-20261123/src/components/pages/AccessRequestsManager.tsx",
+      "before_sha256": "1b9e10d471f218dc1c5e8753ce99d35aa90586a5f098307d5fd6d331d08b0504",
+      "after_sha256": "43070fcba15d53cac14e0be2ae1aa24f6a7c6687b91a1e9f820fc49209fc2928",
+      "description": "Aprovação só aceita estabelecimento ativo e impede vincular mais de um CPF ao mesmo perfil, mantendo múltiplos CNPJs possíveis."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "membership-approval-safety-20261123",
+      "backup": "_backups/membership-approval-safety-20261123/src/App.tsx",
+      "before_sha256": "8e4da37182d0f5e083d64c43c3d21466639b011fd69f0e71008fb3a5ad308e6b",
+      "after_sha256": "1210cf83420951553c407377c163f6fae77b611735f817e4629e2555fe7e3337",
+      "description": "Remove ação de cadastro local de CNPJ/CPF pelo cliente; solicitação e vínculo são controlados pelo administrador."
+    },
+    {
+      "file": "src/components/Navbar.tsx",
+      "stage": "client-readonly-navigation-20261123",
+      "backup": "_backups/client-readonly-navigation-20261123/src/components/Navbar.tsx",
+      "before_sha256": "4f3929373b9a9c901487285c3bfb4ababea8bc8855b9997a6787edfd2cde58c7",
+      "after_sha256": "afa4e38475d12c7f3eda7c32657523722a669856f7f4befde0ad82e23bdab35f",
+      "description": "Oculta botão de gerenciamento/edição de estabelecimentos para clientes; o portal é somente leitura e os vínculos são administrados pelo gestor."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "stage": "verify-membership-on-login-20261123",
+      "backup": "_backups/verify-membership-on-login-20261123/src/utils/googleAuthService.ts",
+      "before_sha256": "c160478420ad3b22c595ac0161d36d81111bc1e5764576ce8cdd562482520073",
+      "after_sha256": "f822dbabdea23ad8fc3a1578ca69798f2c6e3e9889c5505767a95a7c615bbba8",
+      "description": "Na autenticação cliente, confirma cada storeId lendo o membership próprio e o cadastro do estabelecimento; pedido aprovado sem vínculo ativo não gera sessão."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "verify-membership-on-login-20261123",
+      "backup": "_backups/verify-membership-on-login-20261123/src/App.tsx",
+      "before_sha256": "1210cf83420951553c407377c163f6fae77b611735f817e4629e2555fe7e3337",
+      "after_sha256": "4b6b14e46c19411063af34abad1955db30fb60aebaaf4375b2d95534eb7b6691",
+      "description": "O callback do login cliente aguarda a carga remota filtrada por storeId antes de exibir a sessão."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "stage": "admin-revoke-store-membership-20261123",
+      "backup": "_backups/admin-revoke-store-membership-20261123/src/components/pages/AccessRequestsManager.tsx",
+      "before_sha256": "43070fcba15d53cac14e0be2ae1aa24f6a7c6687b91a1e9f820fc49209fc2928",
+      "after_sha256": "03f7fcd23ea65f1d84dfd68a25aacd4bcb74a19551df1954f41816e265d18ebc",
+      "description": "Adiciona revogação administrativa por estabelecimento; remove membership e atualiza storeIds/status da solicitação em transação."
+    },
+    {
+      "file": "server.ts",
+      "stage": "whatsapp-proxy-ssrf-hardening-20261123",
+      "backup": "_backups/whatsapp-proxy-ssrf-hardening-20261123/server.ts",
+      "before_sha256": "f1f89f2f1e6a888bcb51327d43d77446f9ec9c0dd54dc58d63b47379f6162fbc",
+      "after_sha256": "d9ab5b7989ff8556e3f8296775cd24e6d1786854174464a3c48f766936a0a421",
+      "description": "Endurece proxy WhatsApp contra SSRF: valida HTTPS, bloqueia hostnames/IPs locais ou reservados, verifica DNS, impede redirects, aplica timeout e limites de entrada; rota de teste deixa claro que não envia mensagem."
+    },
+    {
+      "file": "server.ts",
+      "stage": "whatsapp-dns-pinning-20261123",
+      "backup": "_backups/whatsapp-dns-pinning-20261123/server.ts",
+      "before_sha256": "d9ab5b7989ff8556e3f8296775cd24e6d1786854174464a3c48f766936a0a421",
+      "after_sha256": "9648d18464e296f021d5b66e3c6e836ea8c6610827020e503b2d0ddcb1013fb5",
+      "description": "Fixa o IP público validado na conexão HTTPS por lookup customizado, preservando SNI/TLS pelo hostname; evita que DNS mude entre validação e conexão (DNS rebinding). Limita resposta do provedor a 1 MB."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "live-client-access-revocation-20261123",
+      "backup": "_backups/live-client-access-revocation-20261123/src/utils/cloudDatabase.ts",
+      "before_sha256": "3c370ed1184a03a925ba4120f215931fa93aa0cfb53068e8c74f385dc2b7e798",
+      "after_sha256": "540369141c07faec2d7e9ba12a971dab6c5ab3b94aabc4ba4aaa3560e8831725",
+      "description": "Adiciona listeners em accessRequests, membership e documento de loja para detectar aprovação, revogação e bloqueio."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "live-client-access-revocation-20261123",
+      "backup": "_backups/live-client-access-revocation-20261123/src/App.tsx",
+      "before_sha256": "4b6b14e46c19411063af34abad1955db30fb60aebaaf4375b2d95534eb7b6691",
+      "after_sha256": "4d782b211d3ecdd2387eba93d792967f62935e76995115f4a092018cc0eefc56",
+      "description": "Recarrega dados quando vínculos mudam e limpa dados em memória/encerra sessão quando não resta estabelecimento autorizado."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "live-revocation-storeid-refresh-20261123",
+      "backup": "_backups/live-revocation-storeid-refresh-20261123/src/utils/cloudDatabase.ts",
+      "before_sha256": "540369141c07faec2d7e9ba12a971dab6c5ab3b94aabc4ba4aaa3560e8831725",
+      "after_sha256": "4c91d2e42a7f8075c81c041fed6aa8a991b92554f6c7f1644377ea87e137513d",
+      "description": "Passa a lista atualizada de storeIds para o listener quando admin adiciona/remove vínculo; estados pendentes/rejeitados enviam lista vazia."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "live-revocation-storeid-refresh-20261123",
+      "backup": "_backups/live-revocation-storeid-refresh-20261123/src/App.tsx",
+      "before_sha256": "4d782b211d3ecdd2387eba93d792967f62935e76995115f4a092018cc0eefc56",
+      "after_sha256": "416f74d43b5cc82419555f859cebefaf8269c377347687e947fa917e447caec5",
+      "description": "Atualiza a lista de storeIds em memória antes de recarregar dados; revoga sessão quando o pedido deixa de aprovado ou fica sem vínculos."
+    },
+    {
+      "file": "src/utils/cnpj.ts",
+      "stage": "cpf-lookup-truthfulness-20261123",
+      "backup": "_backups/cpf-lookup-truthfulness-20261123/src/utils/cnpj.ts",
+      "before_sha256": "9c867d6fdb6dd027c804ef93dd55cec68ddd485532039dbf8091f22e5ccf4c70",
+      "after_sha256": "d121f588c06e21ff20a9b141994376b58dad7a7f68ff337387675abe2cc9b30c",
+      "description": "Reescreve validação/autopreenchimento CPF: mantém conferência matemática e sugestão de dados históricos, remove cidade/UF/bairro/status fictícios e deixa explícito que não há consulta oficial."
+    },
+    {
+      "file": "src/components/StoreModal.tsx",
+      "stage": "cpf-lookup-truthfulness-20261123",
+      "backup": "_backups/cpf-lookup-truthfulness-20261123/src/components/StoreModal.tsx",
+      "before_sha256": "610a5e6338ac8491fb1ee3fcc109b05ed49e7d61a16e7820039f7ff04523944d",
+      "after_sha256": "1509a81623b9573f2ff9f8056131ff393a6e1795aa407120da4072b6c43a5cae",
+      "description": "Corrige rótulos e cards do CPF; não exibe REGULAR/Receita como se consultado, não preenche endereço genérico e grava situação como Não consultada."
+    },
+    {
+      "file": "server.ts",
+      "stage": "cpf-lookup-truthfulness-20261123",
+      "backup": "_backups/cpf-lookup-truthfulness-20261123/server.ts",
+      "before_sha256": "9648d18464e296f021d5b66e3c6e836ea8c6610827020e503b2d0ddcb1013fb5",
+      "after_sha256": "d546c3b4d952f26009370c143a9b324d5320e958bc01828e48f60e48c1b28ff6",
+      "description": "Endpoint público CPF retorna somente validação dos dígitos e indicador regional; remove afirmações falsas de titularidade, endereço e situação REGULAR."
+    },
+    {
+      "file": "src/utils/cnpj.ts",
+      "stage": "remove-legacy-cpf-autofill-20261123",
+      "backup": "_backups/remove-legacy-cpf-autofill-20261123/src/utils/cnpj.ts",
+      "before_sha256": "d121f588c06e21ff20a9b141994376b58dad7a7f68ff337387675abe2cc9b30c",
+      "after_sha256": "157a5cf8f21d10d26c12a793adcab95ac919764689e33aa511c220a8c4e88c1e",
+      "description": "Remove implementação antiga duplicada de lookupCpf que ainda inventava município, bairro e situação REGULAR; mantém somente a nova função que usa dados históricos sem fabricar informações."
+    },
+    {
+      "file": "src/utils/cnpj.ts",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/src/utils/cnpj.ts",
+      "before_sha256": "157a5cf8f21d10d26c12a793adcab95ac919764689e33aa511c220a8c4e88c1e",
+      "after_sha256": "06a16891767cb71af1589023633b61e2c2e8ef61bd06f259c39796a1862f6b4d",
+      "description": "Remove geração fictícia de razão social, nome fantasia, cidade, UF e situação ATIVA quando APIs de CNPJ falham; retorna erro explícito e não inventa dados."
+    },
+    {
+      "file": "server.ts",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/server.ts",
+      "before_sha256": "d546c3b4d952f26009370c143a9b324d5320e958bc01828e48f60e48c1b28ff6",
+      "after_sha256": "1e0a57eec45aa89735d02f9bb7cd6e956ec8150191c31de3a6881a066aa98012",
+      "description": "Fontes públicas CNPJ sem situação retornam campo vazio, sem presumir ATIVA."
+    },
+    {
+      "file": "src/components/StoreModal.tsx",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/src/components/StoreModal.tsx",
+      "before_sha256": "1509a81623b9573f2ff9f8056131ff393a6e1795aa407120da4072b6c43a5cae",
+      "after_sha256": "dbd72024b8a2ce01daaf416a10c2ef56d8a077c6d5bdbf8fe00df1304c5d98e1",
+      "description": "Interface não assume CNPJ ATIVA quando consulta não trouxe situação; grava Não consultada e informa fonte pública sem alegar consulta oficial."
+    },
+    {
+      "file": "src/components/pages/ClientesPage.tsx",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/src/components/pages/ClientesPage.tsx",
+      "before_sha256": "628a293a07773275656157e52ec1247803ded90d784c99e14bde280cbf39578a",
+      "after_sha256": "7170b5004977ba362c0e41d9ca19fd7598a20eb05b2eaec91c95c4d5fd5df483",
+      "description": "Lista de clientes mostra Não consultada quando não existe situação cadastral confirmada."
+    },
+    {
+      "file": "src/components/GoogleAuthModal.tsx",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/src/components/GoogleAuthModal.tsx",
+      "before_sha256": "924f9fae8bd4e1eaa2b340217a105edaf63276b8f451d604b1348eecc34b7f23",
+      "after_sha256": "457cb4676d21b3cfc0ae59ec8ac35039971ad2fd4bd6a2cfa18bfd428c5cff8d",
+      "description": "Perfil mostra Não consultada em vez de presumir CNPJ ATIVA."
+    },
+    {
+      "file": "src/utils/exporter.ts",
+      "stage": "remove-fake-cnpj-fallback-20261123",
+      "backup": "_backups/remove-fake-cnpj-fallback-20261123/src/utils/exporter.ts",
+      "before_sha256": "253e2701129ac8cdd1af76c4982a2177aea2437fed9b0ac010f6b7db85c11364",
+      "after_sha256": "e909a20daf836bb5ef032eb1e736db9c621dbaba7de01bc6012fbcbcaf012a3e",
+      "description": "Exportação não assume situação ATIVA quando ausente."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "client-readonly-mutation-guards-20261123",
+      "backup": "_backups/client-readonly-mutation-guards-20261123/src/App.tsx",
+      "before_sha256": "416f74d43b5cc82419555f859cebefaf8269c377347687e947fa917e447caec5",
+      "after_sha256": "91db115cf234932da18415adbd9b5fefeaaa3996e387134d3571702be311e4f9",
+      "description": "Bloqueia handlers de débito, pagamento, alteração de status, edição/criação de serviço e edição de fotos para clientes; oculta ação de baixa de pagamento nos lembretes."
+    },
+    {
+      "file": "src/components/PhotoGalleryModal.tsx",
+      "stage": "client-readonly-mutation-guards-20261123",
+      "backup": "_backups/client-readonly-mutation-guards-20261123/src/components/PhotoGalleryModal.tsx",
+      "before_sha256": "60c8053dd04257fef5dc8d668e226a7eede37870276c73ea5e990aef15361fe4",
+      "after_sha256": "8dc315c01882f0845d242d9f745b2644a8e49721120a652375a14f34fa16d620",
+      "description": "Adiciona modo somente leitura para clientes: permite visualizar/baixar fotos, mas não enviar ou excluir."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "fix-payment-handler-guard-20261123",
+      "backup": "_backups/fix-payment-handler-guard-20261123/src/App.tsx",
+      "before_sha256": "91db115cf234932da18415adbd9b5fefeaaa3996e387134d3571702be311e4f9",
+      "after_sha256": "84843f559fe9a9fb8daa84cb30b1489778ae51b05a0a7d6f829fabaa7f34003b",
+      "description": "Corrige o guard de somente leitura no handler de confirmação de pagamento, sem duplicar assinatura do callback."
+    },
+    {
+      "file": "src/components/PhotoGalleryModal.tsx",
+      "stage": "fix-photo-readonly-jsx-20261123",
+      "backup": "_backups/fix-photo-readonly-jsx-20261123/src/components/PhotoGalleryModal.tsx",
+      "before_sha256": "8dc315c01882f0845d242d9f745b2644a8e49721120a652375a14f34fa16d620",
+      "after_sha256": "384b5db04ac6d764ed76c7a10a0142196a1f222ccb6ce08a282c7d9ca3e9864c",
+      "description": "Agrupa os controles de upload em fragmento JSX para modo somente leitura do cliente."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "reset-ui-state-on-auth-change-20261123",
+      "backup": "_backups/reset-ui-state-on-auth-change-20261123/src/App.tsx",
+      "before_sha256": "84843f559fe9a9fb8daa84cb30b1489778ae51b05a0a7d6f829fabaa7f34003b",
+      "after_sha256": "0214051de15de98a0b4722d777b170422b532de026456ffa1c5ea90f4d79efd5",
+      "description": "Limpa modais, seleções e estado visual ao trocar identidade Firebase; impede que modais administrativos de sessão anterior sejam exibidos ao cliente."
+    },
+    {
+      "file": "src/components/Navbar.tsx",
+      "stage": "hide-admin-sync-controls-from-client-20261123",
+      "backup": "_backups/hide-admin-sync-controls-from-client-20261123/src/components/Navbar.tsx",
+      "before_sha256": "afa4e38475d12c7f3eda7c32657523722a669856f7f4befde0ad82e23bdab35f",
+      "after_sha256": "ab947466f30aa73221a03f487b436ae97fff5318f994437aa894dc2b97d025a1",
+      "description": "Oculta painel/indicador de sincronização administrativa para clientes."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "hide-admin-sync-controls-from-client-20261123",
+      "backup": "_backups/hide-admin-sync-controls-from-client-20261123/src/App.tsx",
+      "before_sha256": "0214051de15de98a0b4722d777b170422b532de026456ffa1c5ea90f4d79efd5",
+      "after_sha256": "a4d91da9a05d36dfb3b3258b554b7af0119cde631f683ee19382503e706a8005",
+      "description": "Impede abrir modal de sincronização administrativa na sessão cliente."
+    },
+    {
+      "file": "src/components/StoreModal.tsx",
+      "stage": "cnpj-source-label-accuracy-20261123",
+      "backup": "_backups/cnpj-source-label-accuracy-20261123/src/components/StoreModal.tsx",
+      "before_sha256": "dbd72024b8a2ce01daaf416a10c2ef56d8a077c6d5bdbf8fe00df1304c5d98e1",
+      "after_sha256": "e87947c618013aa4ec4d258b34a305bd8967d7880b86055b1323a5b4fe4c7261",
+      "description": "Ajusta os rótulos para informar consulta em fontes públicas, sem sugerir integração oficial direta quando usa agregadores."
+    },
+    {
+      "file": "server.ts",
+      "stage": "cnpj-source-label-accuracy-20261123",
+      "backup": "_backups/cnpj-source-label-accuracy-20261123/server.ts",
+      "before_sha256": "1e0a57eec45aa89735d02f9bb7cd6e956ec8150191c31de3a6881a066aa98012",
+      "after_sha256": "a3002bea8ba4ce7fefa4dc80884067acc1677bb517a22060a2e708731e995c78",
+      "description": "Mensagem de erro de CNPJ identifica as fontes públicas consultadas sem afirmar consulta oficial direta à Receita Federal."
+    },
+    {
+      "file": "src/utils/googleAuthService.ts",
+      "stage": "fix-client-request-ref-email-20261123",
+      "backup": "_backups/fix-client-request-ref-email-20261123/src/utils/googleAuthService.ts",
+      "before_sha256": "f822dbabdea23ad8fc3a1578ca69798f2c6e3e9889c5505767a95a7c615bbba8",
+      "after_sha256": "21e082f363e19fa313d70bc3ae2ac2ef181caaff30627e0019a1d3e44796092d",
+      "description": "Corrige escopo de requestRef usado após a transação e grava o e-mail Firebase verificado sem normalização para coincidir exatamente com a regra Firestore; compara normalizado na leitura."
+    },
+    {
+      "file": "src/components/pages/AccessRequestsManager.tsx",
+      "stage": "fix-client-request-ref-email-20261123",
+      "backup": "_backups/fix-client-request-ref-email-20261123/src/components/pages/AccessRequestsManager.tsx",
+      "before_sha256": "03f7fcd23ea65f1d84dfd68a25aacd4bcb74a19551df1954f41816e265d18ebc",
+      "after_sha256": "16c512bbb65c4710d76abb2d0a6a0a2c29d5ac237e8792a7473a7dd0d4be3d71",
+      "description": "Usa sempre o ID real do documento como UID ao mapear solicitações."
+    },
+    {
+      "file": "firestore.rules",
+      "stage": "required-storeid-record-integrity-20261123",
+      "backup": "_backups/required-storeid-record-integrity-20261123/firestore.rules",
+      "before_sha256": "7c303c9cfd8ffbb2e9dbeb8e4accffc07aebc6e79c06852bd49cf0e717030c4c",
+      "after_sha256": "47f0aeab32792c554a6569ef0379d291aead0956c31cb5e9886fff5f73a5af06",
+      "description": "Criação/atualização de serviços, obras e visitas exige storeId que aponte para um estabelecimento existente; leitura do cliente segue membership ativo."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "required-storeid-record-integrity-20261123",
+      "backup": "_backups/required-storeid-record-integrity-20261123/src/utils/cloudDatabase.ts",
+      "before_sha256": "4c91d2e42a7f8075c81c041fed6aa8a991b92554f6c7f1644377ea87e137513d",
+      "after_sha256": "3b99b6cf079810597cbdf64e8f49666f0e9192e0221f771c54397acaa51df3c1",
+      "description": "Helpers de persistência recusam gravar serviços, obras e visitas sem storeId."
+    },
+    {
+      "file": "src/components/pages/VisitasPage.tsx",
+      "stage": "required-storeid-record-integrity-20261123",
+      "backup": "_backups/required-storeid-record-integrity-20261123/src/components/pages/VisitasPage.tsx",
+      "before_sha256": "2da4933fd23b6ac79312aa09d1eaa8b8bf21aa41851c6af3ed0680cd7a16dc97",
+      "after_sha256": "a78c4340b92e8aa21969c439f66578fa2adf3dc35af67a0aba5f839931a5294f",
+      "description": "Nova visita/edição exige seleção explícita de estabelecimento; remove associação automática por nome."
+    },
+    {
+      "file": "src/components/pages/ObrasPage.tsx",
+      "stage": "required-storeid-record-integrity-20261123",
+      "backup": "_backups/required-storeid-record-integrity-20261123/src/components/pages/ObrasPage.tsx",
+      "before_sha256": "2c3bcffb4a21e6ddd6342c005249b12acd51633e4eab359175dc2c335c845080",
+      "after_sha256": "a7c79461abb964c6fd64244a4f39a7c2e6585ba55e17f6065ebdcea1719aa4bd",
+      "description": "Criação/edição de obra exige estabelecimento existente e remove fallback Cliente Diversos."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "required-storeid-record-integrity-20261123",
+      "backup": "_backups/required-storeid-record-integrity-20261123/src/App.tsx",
+      "before_sha256": "a4d91da9a05d36dfb3b3258b554b7af0119cde631f683ee19382503e706a8005",
+      "after_sha256": "aa148a1a8010194ca619e99834b97a6e30d5f9f64a57366de90c5483647cae81",
+      "description": "Criação de serviço deixa de inventar store_1/Loja quando não existe estabelecimento selecionado."
+    },
+    {
+      "file": "src/App.tsx",
+      "stage": "client-admin-action-guards-20261123",
+      "backup": "_backups/client-admin-action-guards-20261123/src/App.tsx",
+      "before_sha256": "aa148a1a8010194ca619e99834b97a6e30d5f9f64a57366de90c5483647cae81",
+      "after_sha256": "205e65c1ce7150eaeda6d11b671016f9dc97e386312c24661aaefd29cd0319c9",
+      "description": "Bloqueia handlers administrativos de sincronização, configurações PIX e notificações para cliente; lembretes automáticos e gravação de config só executam para admin."
+    },
+    {
+      "file": "firestore.rules",
+      "stage": "store-status-legacy-compat-20261123",
+      "backup": "_backups/store-status-legacy-compat-20261123/firestore.rules",
+      "before_sha256": "83a67c442d7128b9b43c04a82a0276d8036a699ee4ed7eb6659de019b4ac1b8b",
+      "after_sha256": "43bc2554719d1bc60670c898eceec237e4fd1d645ba1e62586c19d6f69bbf96c",
+      "description": "Compatibilidade segura para estabelecimentos legados sem campo status e validação de UID/storeId no documento de membership."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "dynamic-client-membership-listeners-20261123",
+      "backup": "_backups/client-membership-listeners-20261123/src/utils/cloudDatabase.ts",
+      "before_sha256": "f1d38700790a9959f663d72773a1cff0ef237a03bdf6457c6821842c33cc0a73",
+      "after_sha256": "ff7da9f868906f9d3872300cf1b2ac5c97b712775077dfdea4395b8c8ab9bbe0",
+      "description": "Recria ouvintes de membership e estabelecimento para cada lista aprovada atualizada, incluindo novos vínculos após login."
+    },
+    {
+      "file": "src/utils/cloudDatabase.ts",
+      "stage": "membership-listener-change-detection-20261123",
+      "backup": "_backups/client-membership-listeners-20261123-v2/src/utils/cloudDatabase.ts",
+      "before_sha256": "ff7da9f868906f9d3872300cf1b2ac5c97b712775077dfdea4395b8c8ab9bbe0",
+      "after_sha256": "940c717f7c5060df6b27eef689a115a12473ceb00e2c09ed5f97103437b6a9bf",
+      "description": "Snapshots iniciais válidos não disparam refresh em loop; alterações posteriores de estado/identidade ainda acionam validação."
+    }
+  ]
+}

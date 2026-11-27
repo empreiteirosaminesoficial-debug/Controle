@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.empreiteirosamines.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0F:52:AB:7B:8E:22:98:8C:87:66:35:E1:68:57:3E:45:9E:C9:83:8B:2A:42:35:10:7C:3A:FB:65"
+      ]
+    }
+  }
+]
