@@ -22,6 +22,8 @@ interface AppNavigationProps {
   currentPage: AppPage;
   onPageChange: (page: AppPage) => void;
   counts?: AppNavigationCounts;
+  /** Itens novos ainda não vistos por página (badge vermelho). Zera ao abrir a página. */
+  newCounts?: Partial<Record<AppPage, number>>;
   isClient?: boolean;
 }
 
@@ -82,6 +84,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
   currentPage,
   onPageChange,
   counts,
+  newCounts,
   isClient = false,
 }) => {
   const visibleNavItems = NAV_ITEMS.filter((item) => {
@@ -114,6 +117,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
             item.id === 'clientes' ? counts?.stores :
             item.id === 'comprovantes' ? counts?.comprovantes : undefined;
 
+          const newCount = newCounts?.[item.id] ?? 0;
           const countToDisplay = (isClient && (item.id === 'visitas' || item.id === 'servicos')) ? (badgeCount ?? 0) : badgeCount;
 
           return (
@@ -141,6 +145,16 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({
                   }`}
                 >
                   {countToDisplay}
+                </span>
+              )}
+
+              {newCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black rounded-full bg-red-600 text-white shadow-md ring-2 ring-white animate-pulse"
+                  aria-label={`${newCount} novidade(s)`}
+                  title={`${newCount} novidade(s) não vista(s)`}
+                >
+                  {newCount > 99 ? '99+' : newCount}
                 </span>
               )}
 

@@ -111,8 +111,11 @@ import {
   listenAuthorizedClientData,
   markClientNotificationAsRead,
   listenClientNotifications,
-  listenClientApprovalStatus
+  listenClientApprovalStatus,
+  flushCloudOutbox,
+  getLastCloudWriteError
 } from './utils/cloudDatabase';
+import { mergeWithPendingWrites, countPendingWrites } from './utils/cloudOutbox';
 
 // Components
 import { Navbar } from './components/Navbar';
@@ -155,6 +158,45 @@ import { EmpresaPage } from './components/pages/EmpresaPage';
 import { PlayStoreApkModal } from './components/PlayStoreApkModal';
 import { loadWhatsAppConfig } from './utils/whatsappStorage';
 
+// --- Controle local de avisos já exibidos (evita som/aviso duplicado) --------
+function readIdSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set<string>(Array.isArray(parsed) ? parsed.filter((id: unknown): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeIdSet(key: string, ids: Set<string>) {
+  try {
+    // Mantém só os 800 mais recentes para não crescer indefinidamente.
+    localStorage.setItem(key, JSON.stringify([...ids].slice(-800)));
+  } catch {
+    // ignore
+  }
+}
+
+const ADMIN_ALERTED_VISITS_KEY = 'samines_admin_alerted_visit_requests_v1';
+const ADMIN_SEEN_VISITS_KEY = 'samines_admin_seen_visit_requests_v1';
+const loadAlertedVisitRequestIds = () => readIdSet(ADMIN_ALERTED_VISITS_KEY);
+const saveAlertedVisitRequestIds = (ids: Set<string>) => writeIdSet(ADMIN_ALERTED_VISITS_KEY, ids);
+const clientAlertedKey = (uid: string) => `samines_client_alerted_notifications_v1_${uid}`;
+
+/** Página onde o aviso deve acender o contador do botão. */
+function notificationPage(notification: AppNotification): AppPage | null {
+  const category = notification.category
+    || (notification.type === 'comprovante' ? 'comprovante'
+      : notification.serviceId ? 'servico'
+      : undefined);
+  if (category === 'servico' || category === 'pagamento') return 'servicos';
+  if (category === 'visita' || category === 'orcamento') return 'visitas';
+  if (category === 'comprovante') return 'comprovantes';
+  if (category === 'obra') return 'obras';
+  return null;
+}
+
 export default function App() {
   // --- Global App States ---
   // Dados empresariais só são carregados após o Firebase confirmar o administrador.
@@ -162,6 +204,9 @@ export default function App() {
   const [stores, setStores] = useState<StoreProfile[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
+  // Chave estável dos estabelecimentos autorizados: evita reinstalar os listeners
+  // do cliente só porque o array foi recriado com o mesmo conteúdo.
+  const authorizedStoreKey = [...new Set(user?.authorizedStoreIds || [])].filter(Boolean).sort().join('|');
   const [authReady, setAuthReady] = useState(false);
   const [accessApprovalStatus, setAccessApprovalStatus] = useState<'none' | 'pending' | 'checking' | 'rejected'>('none');
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -501,7 +546,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       unsubscribe();
     };
-  }, [authReady, user?.id, user?.role, user?.authorizedStoreIds]);
+  }, [authReady, user?.id, user?.role, authorizedStoreKey]);
 
   // Dados autorizados do cliente permanecem sincronizados em tempo real.
   useEffect(() => {
@@ -518,14 +563,16 @@ export default function App() {
       if (!active || auth.currentUser?.uid !== uid) return;
       setServices(data.services);
       setObras(data.obras);
-      setVisitas(data.visitas);
+      // Solicitações de visita do próprio cliente ainda não confirmadas continuam visíveis.
+      setVisitas(mergeWithPendingWrites('visitas', data.visitas)
+        .filter((item) => Boolean(item.storeId && storeIds.includes(item.storeId))));
     });
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [authReady, isOnline, user?.id, user?.role, user?.status, user?.authorizedStoreIds]);
+  }, [authReady, isOnline, user?.id, user?.role, user?.status, authorizedStoreKey]);
 
   // Clientes recebem somente notificações direcionadas aos CNPJs/estabelecimentos aprovados.
   useEffect(() => {
@@ -541,38 +588,34 @@ export default function App() {
     }
 
     clientNotificationIdsRef.current = new Set();
-    let initialized = false;
+    const uid = user.id;
 
-    const unsubscribe = listenClientNotifications(user.id, storeIds, (clientNotifications) => {
+    const unsubscribe = listenClientNotifications(uid, storeIds, (clientNotifications) => {
       setNotifications(clientNotifications);
 
-      const knownIds = clientNotificationIdsRef.current;
-      const newNotifications = clientNotifications.filter((notification) => !knownIds.has(notification.id));
+      // Cada aviso toca/aparece uma única vez por aparelho, mesmo que o listener
+      // seja reinstalado (reconexão, troca de vínculos) ou a página recarregada.
+      const alerted = readIdSet(clientAlertedKey(uid));
+      const fresh = clientNotifications.filter((notification) => !notification.read && !alerted.has(notification.id));
+      clientNotifications.forEach((notification) => alerted.add(notification.id));
+      writeIdSet(clientAlertedKey(uid), alerted);
+      if (fresh.length === 0) return;
 
-      clientNotifications.forEach((notification) => knownIds.add(notification.id));
-
-      if (!initialized) {
-        initialized = true;
-        const latestUnread = clientNotifications.find((notification) => !notification.read);
-        if (latestUnread) setActiveToastNotification(latestUnread);
-        return;
-      }
-
-      const newest = newNotifications[0];
-      if (newest) {
-        setActiveToastNotification(newest);
-        if (getNotificationPermission() === 'granted') {
-          void triggerMobileAndBrowserNotification({
-            title: newest.title,
-            body: newest.body,
-            type: newest.type,
-          });
-        }
-      }
+      const newest = fresh[0];
+      setActiveToastNotification(newest);
+      const isVisit = newest.category === 'visita' || newest.category === 'orcamento' || Boolean(newest.visitaId);
+      // Som e vibração não dependem da permissão de notificação do navegador;
+      // a permissão só controla o pop-up do sistema operacional.
+      void triggerMobileAndBrowserNotification({
+        title: fresh.length > 1 ? `${fresh.length} novas atualizações` : newest.title,
+        body: fresh.length > 1 ? newest.title : newest.body,
+        type: newest.type,
+        sound: isVisit ? 'visit' : undefined,
+      });
     });
 
     return () => unsubscribe();
-  }, [authReady, isOnline, user?.id, user?.role, user?.status, user?.authorizedStoreIds]);
+  }, [authReady, isOnline, user?.id, user?.role, user?.status, authorizedStoreKey]);
 
   // Sincronização inicial e sempre que o usuário conectar/mudar de perfil
   useEffect(() => {
@@ -646,8 +689,11 @@ export default function App() {
     // Listener de servicos
     const unsubServices = listenCloudServices((cloudServices) => {
       if (!active || isRemoteSyncRef.current) return;
-      setServices(cloudServices);
-      saveServices(cloudServices);
+      // Mantém por cima as alterações locais ainda não confirmadas pelo Firestore,
+      // para que um serviço recém-criado/editado não suma da tela.
+      const merged = mergeWithPendingWrites('services', cloudServices);
+      setServices(merged);
+      saveServices(merged);
     });
 
     // Listener de lojas e clientes
@@ -691,37 +737,58 @@ export default function App() {
     // Obras em tempo real
     const unsubObras = listenCloudObras((cloudObras) => {
       if (!active || isRemoteSyncRef.current) return;
-      setObras(cloudObras);
-      saveObras(cloudObras);
+      const merged = mergeWithPendingWrites('obras', cloudObras);
+      setObras(merged);
+      saveObras(merged);
     });
 
-    // Listener de visitas
+    // Listener de visitas: recebe em tempo real as solicitações feitas pelos clientes.
     const unsubVisitas = listenCloudVisitas((cloudVisitas) => {
       if (!active || isRemoteSyncRef.current) return;
-      const incomingRequests = cloudVisitas.filter((item) => item.status === 'solicitada');
-      if (initialVisitsSnapshot) {
-        knownVisitRequestIds = new Set(incomingRequests.map((item) => item.id));
-        initialVisitsSnapshot = false;
-      } else {
-        const newRequests = incomingRequests.filter((item) => !knownVisitRequestIds.has(item.id));
-        newRequests.forEach((item) => {
-          knownVisitRequestIds.add(item.id);
-          void addNotificationRecord({
-            title: 'Nova solicitação de visita',
-            body: `${item.clientName} solicitou visita para ${item.date}${item.time ? ` às ${item.time}` : ''}.`,
-            type: 'novo_servico',
-          });
-          void triggerMobileAndBrowserNotification({
-            title: 'Nova solicitação de visita',
-            body: `${item.clientName} solicitou visita para ${item.date}${item.time ? ` às ${item.time}` : ""}.`,
-            type: 'novo_servico',
-          });
+      const merged = mergeWithPendingWrites('visitas', cloudVisitas);
+      setVisitas(merged);
+      saveVisitas(merged);
+
+      // Aviso ao ADM: somente visual (sem som), uma vez por solicitação, inclusive
+      // para pedidos que chegaram enquanto o app estava fechado.
+      const alerted = loadAlertedVisitRequestIds();
+      const fresh = merged.filter((item) => item.status === 'solicitada' && !alerted.has(item.id));
+      if (fresh.length === 0) return;
+      fresh.forEach((item) => alerted.add(item.id));
+      saveAlertedVisitRequestIds(alerted);
+
+      const newest = [...fresh].sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || ''))[0];
+      const title = fresh.length > 1 ? `${fresh.length} novas solicitações de visita` : 'Nova solicitação de visita';
+      const body = fresh.length > 1
+        ? `A mais recente: ${newest.clientName}, para ${newest.date}${newest.time ? ` às ${newest.time}` : ''}.`
+        : `${newest.clientName} solicitou visita para ${newest.date}${newest.time ? ` às ${newest.time}` : ''}.`;
+
+      fresh.forEach((item) => {
+        // Id fixo por solicitação: várias abas/aparelhos do ADM não duplicam o histórico.
+        void addNotificationRecord({
+          title: 'Nova solicitação de visita 📅',
+          body: `${item.clientName} solicitou visita para ${item.date}${item.time ? ` às ${item.time}` : ''}.`,
+          type: 'novo_servico',
+          storeId: item.storeId,
+          category: 'visita',
+          visitaId: item.id,
+          dedupeId: `notif_visitreq_${item.id}`,
+          audience: 'admin',
         });
-      }
-      if (cloudVisitas) {
-        setVisitas(cloudVisitas);
-        saveVisitas(cloudVisitas);
-      }
+      });
+
+      setActiveToastNotification({
+        id: `toast_visitreq_${newest.id}`,
+        title,
+        body,
+        type: 'novo_servico',
+        timestamp: new Date().toISOString(),
+        read: false,
+        audience: 'admin',
+        category: 'visita',
+        visitaId: newest.id,
+      });
+      void triggerMobileAndBrowserNotification({ title, body, type: 'novo_servico', silent: true });
     });
 
     return () => {
@@ -734,6 +801,30 @@ export default function App() {
       unsubVisitas();
     };
   }, [authReady, isOnline, user?.email, user?.role, user?.status]);
+
+  // Reenvio automático da fila de gravações pendentes (ADM e cliente):
+  // ao entrar, ao reconectar e a cada 30 s enquanto houver pendências.
+  useEffect(() => {
+    if (!authReady || !user || user.status !== 'active' || !isOnline) return;
+    let active = true;
+    const collections = user.role === 'admin'
+      ? (['services', 'obras', 'visitas'] as const)
+      : (['visitas'] as const);
+    const flush = () => {
+      if (!active || countPendingWrites() === 0) return;
+      void flushCloudOutbox([...collections]).then((result) => {
+        if (result.sent > 0) console.info(`[CloudOutbox] ${result.sent} alteração(ões) pendente(s) enviada(s).`);
+      });
+    };
+    flush();
+    const intervalId = window.setInterval(flush, 30000);
+    window.addEventListener('online', flush);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('online', flush);
+    };
+  }, [authReady, isOnline, user?.id, user?.role, user?.status]);
 
   // Save services changes to localStorage and broadcast safely without re-render loop
   useEffect(() => {
@@ -965,12 +1056,23 @@ export default function App() {
     type: AppNotification['type'];
     serviceId?: string;
     storeId?: string;
+    category?: AppNotification['category'];
+    visitaId?: string;
+    /** Id fixo para evitar avisos duplicados (ex.: duas abas do ADM recebendo o mesmo evento). */
+    dedupeId?: string;
+    /** Força o aviso a ficar só no histórico do ADM, mesmo com estabelecimento associado. */
+    audience?: 'admin' | 'client';
   }) => {
-    const notificationId = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const notificationId = params.dedupeId || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const targetStoreId = params.storeId
       || (params.serviceId ? services.find((service) => service.id === params.serviceId)?.storeId : undefined);
+    const category: AppNotification['category'] = params.category
+      || (params.type === 'pagamento' ? 'pagamento'
+        : params.type === 'comprovante' ? 'comprovante'
+        : params.serviceId ? 'servico'
+        : undefined);
 
-    if (targetStoreId) {
+    if (targetStoreId && params.audience !== 'admin') {
       // Avisos de serviços/visitas/obras vão exclusivamente para o cliente daquele estabelecimento.
       const clientNotification: AppNotification = {
         id: `${notificationId}_client`,
@@ -980,11 +1082,13 @@ export default function App() {
         timestamp: new Date().toISOString(),
         read: false,
         serviceId: params.serviceId,
+        visitaId: params.visitaId,
         storeId: targetStoreId,
         audience: 'client',
+        category,
       };
-      saveCloudNotification(clientNotification).catch((error) => {
-        console.warn('[Notifications] Não foi possível enviar aviso ao cliente:', error);
+      saveCloudNotification(clientNotification).then((saved) => {
+        if (!saved) console.warn('[Notifications] Não foi possível enviar aviso ao cliente.');
       });
       return;
     }
@@ -998,7 +1102,10 @@ export default function App() {
       timestamp: new Date().toISOString(),
       read: false,
       serviceId: params.serviceId,
+      visitaId: params.visitaId,
+      storeId: targetStoreId,
       audience: 'admin',
+      category,
     };
 
     setNotifications((prev) => (prev.some((n) => n.id === adminNotification.id) ? prev : [adminNotification, ...prev]));
@@ -1050,6 +1157,52 @@ export default function App() {
     const allowed = new Set(user.authorizedStoreIds || []);
     return visitas.filter((visita) => Boolean(visita.storeId && allowed.has(visita.storeId)));
   }, [visitas, isClient, user?.authorizedStoreIds]);
+
+  // --- Contadores de novidades nos botões (zeram ao abrir a página) ---
+  const [seenVisitRequestIds, setSeenVisitRequestIds] = useState<Set<string>>(() => readIdSet(ADMIN_SEEN_VISITS_KEY));
+
+  const navNewCounts = useMemo<Partial<Record<AppPage, number>>>(() => {
+    if (!user) return {};
+    if (!isClient) {
+      // ADM: solicitações de visita ainda não vistas.
+      const pendingRequests = visitas.filter((v) => v.status === 'solicitada' && !seenVisitRequestIds.has(v.id)).length;
+      return { visitas: pendingRequests };
+    }
+    // Cliente: avisos não lidos agrupados pela página correspondente.
+    const counts: Partial<Record<AppPage, number>> = {};
+    notifications.forEach((notification) => {
+      if (notification.read || notification.audience !== 'client') return;
+      const page = notificationPage(notification);
+      if (page) counts[page] = (counts[page] || 0) + 1;
+    });
+    return counts;
+  }, [user, isClient, visitas, seenVisitRequestIds, notifications]);
+
+  // Ao abrir uma página, zera o contador dela sem apagar o histórico de notificações.
+  useEffect(() => {
+    if (!user || user.status !== 'active') return;
+    if (!isClient) {
+      if (currentPage !== 'visitas') return;
+      const requestIds = visitas.filter((v) => v.status === 'solicitada').map((v) => v.id);
+      if (requestIds.every((id) => seenVisitRequestIds.has(id))) return;
+      const next = new Set<string>(seenVisitRequestIds);
+      requestIds.forEach((id) => next.add(id));
+      writeIdSet(ADMIN_SEEN_VISITS_KEY, next);
+      setSeenVisitRequestIds(next);
+      return;
+    }
+    const toMark = notifications.filter((notification) =>
+      !notification.read && notification.audience === 'client' && notificationPage(notification) === currentPage
+    );
+    if (toMark.length === 0) return;
+    const markedIds = new Set(toMark.map((notification) => notification.id));
+    setNotifications((prev) => prev.map((notification) =>
+      markedIds.has(notification.id) ? { ...notification, read: true } : notification
+    ));
+    toMark.forEach((notification) => {
+      void markClientNotificationAsRead(user.id, notification);
+    });
+  }, [currentPage, isClient, user?.id, user?.status, visitas, notifications, seenVisitRequestIds]);
 
   // --- Filtering Services ---
   const filteredServices = useMemo(() => {
@@ -1477,6 +1630,16 @@ export default function App() {
     setServices(updatedList);
     const currentSelected = updatedList.find(s => s.id === serviceId);
     if (currentSelected) setSelectedServiceForPhoto(currentSelected);
+    // Fotos também precisam chegar ao cliente (antes ficavam só no aparelho do ADM).
+    if (currentSelected) {
+      saveCloudService(currentSelected).then((saved) => {
+        if (!saved) {
+          const reason = getLastCloudWriteError();
+          console.warn('[Fotos] Serviço mantido na fila de reenvio:', reason);
+          if (reason && reason.includes('1 MB')) window.alert(reason);
+        }
+      });
+    }
 
     addNotificationRecord({
       title: 'Fotos Anexadas ao Serviço 📷',
@@ -1511,6 +1674,16 @@ export default function App() {
     setServices(updatedList);
     const currentSelected = updatedList.find(s => s.id === serviceId);
     if (currentSelected) setSelectedServiceForPhoto(currentSelected);
+    // Fotos também precisam chegar ao cliente (antes ficavam só no aparelho do ADM).
+    if (currentSelected) {
+      saveCloudService(currentSelected).then((saved) => {
+        if (!saved) {
+          const reason = getLastCloudWriteError();
+          console.warn('[Fotos] Serviço mantido na fila de reenvio:', reason);
+          if (reason && reason.includes('1 MB')) window.alert(reason);
+        }
+      });
+    }
 
     logAdminActionSync(
       'Foto Removida',
@@ -1689,13 +1862,12 @@ export default function App() {
     setStores(prev => prev.filter(st => st.id !== storeId));
     deleteCloudStore(storeId).catch(() => {});
 
-    // Zero out and remove all associated services and their values
-    setServices(prev => prev.filter(s => {
-      if (s.storeId === storeId) return false;
-      if (target && s.storeCnpj === target.cnpj) return false;
-      if (targetCleanDoc && cleanDocument(s.storeCnpj || '') === targetCleanDoc) return false;
-      return true;
-    }));
+    // Remove da tela somente os serviços DESTE estabelecimento (por storeId).
+    // Antes a comparação também usava o CNPJ, o que apagava serviços de outra loja
+    // cadastrada com o mesmo documento. Os registros continuam no Firebase como
+    // histórico; sem o cadastro da loja, nenhum cliente consegue acessá-los.
+    void targetCleanDoc;
+    setServices(prev => prev.filter(s => s.storeId !== storeId));
 
     if (selectedStoreId === storeId) {
       setSelectedStoreId('todas');
@@ -1703,7 +1875,7 @@ export default function App() {
     if (target) {
       addNotificationRecord({
         title: 'Cliente e Serviços Removidos 🗑️',
-        body: `O cliente "${target.nomeFantasia}" foi excluído e todos os seus serviços e valores foram zerados.`,
+        body: `O estabelecimento "${target.nomeFantasia}" foi excluído. Os demais estabelecimentos e vínculos não foram alterados.`,
         type: 'aviso',
       });
 
@@ -1754,6 +1926,7 @@ export default function App() {
       body: `Canteiro "${obra.title}" atualizado com sucesso (${obra.progressPercent}% concluída).`,
       type: 'status',
       storeId: obra.storeId,
+      category: 'obra',
     });
   };
 
@@ -1780,10 +1953,26 @@ export default function App() {
         return updated;
       });
       saveCloudVisita(clientRequest).then((saved) => {
-        if (!saved) console.warn('[Visitas] Solicitação não foi sincronizada com a nuvem.');
+        if (saved) {
+          setActiveToastNotification({
+            id: `toast_visit_sent_${clientRequest.id}`,
+            title: 'Solicitação de visita enviada ✅',
+            body: `Sua solicitação para ${clientRequest.date}${clientRequest.time ? ` às ${clientRequest.time}` : ''} foi enviada. Você será avisado quando a equipe confirmar.`,
+            type: 'novo_servico',
+            timestamp: new Date().toISOString(),
+            read: true,
+            audience: 'client',
+            category: 'visita',
+          });
+          return;
+        }
+        const reason = getLastCloudWriteError() || 'Falha desconhecida.';
+        console.warn('[Visitas] Solicitação mantida na fila de reenvio:', reason);
+        window.alert(`Sua solicitação de visita ainda não chegou à equipe.\n\n${reason}\n\nEla ficou guardada neste aparelho e será reenviada automaticamente.`);
       });
       return;
     }
+    const previousVisita = visitas.find((item) => item.id === visita.id);
     setVisitas((prev) => {
       const exists = prev.findIndex(v => v.id === visita.id);
       let updated: VisitaRecord[];
@@ -1807,11 +1996,20 @@ export default function App() {
       ? `${visita.notes.trim()}`
       : `Registro de visita para "${visita.clientName}" adicionado ao sistema.`;
 
+    const statusLabel: Record<string, string> = {
+      solicitada: 'solicitada', agendada: 'agendada', realizada: 'realizada', cancelada: 'cancelada',
+    };
     addNotificationRecord({
-      title: notifTitle,
-      body: notifBody,
+      title: previousVisita && previousVisita.status !== visita.status
+        ? `Visita ${statusLabel[visita.status] || visita.status}: ${visita.clientName} 📋`
+        : notifTitle,
+      body: previousVisita && previousVisita.status !== visita.status
+        ? `Sua visita de ${visita.date}${visita.time ? ` às ${visita.time}` : ''} agora está ${statusLabel[visita.status] || visita.status}.${visita.notes?.trim() ? ` ${visita.notes.trim()}` : ''}`
+        : notifBody,
       type: 'novo_servico',
       storeId: visita.storeId,
+      category: visita.purpose === 'orcamento' && visita.estimatedBudgetProposal ? 'orcamento' : 'visita',
+      visitaId: visita.id,
     });
   };
 
@@ -1997,6 +2195,7 @@ export default function App() {
             stores: visibleStores.length,
             comprovantes: totalComprovantesCount,
           }}
+          newCounts={navNewCounts}
           isClient={isClient}
         />
 
@@ -2649,6 +2848,10 @@ export default function App() {
           saveServices(
             services.map((s) => (s.id === updatedService.id ? updatedService : s))
           );
+          // Antes o serviço atualizado (valor pago/comprovante) ficava só no aparelho do ADM.
+          saveCloudService(updatedService).then((saved) => {
+            if (!saved) console.warn('[Comprovante] Serviço mantido na fila de reenvio:', getLastCloudWriteError());
+          });
 
           // Gera notificação para o cliente cadastrado
           const targetStore = stores.find((st) => st.id === receipt.storeId);
@@ -2660,7 +2863,9 @@ export default function App() {
           const targetedClientNotification: AppNotification = {
             ...clientNotif,
             storeId: receipt.storeId,
+            serviceId: updatedService.id,
             audience: 'client',
+            category: 'comprovante',
           };
           saveCloudNotification(targetedClientNotification).catch((error) => {
             console.warn('[Notifications] Falha ao enviar comprovante ao cliente:', error);

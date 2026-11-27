@@ -112,6 +112,10 @@ export interface AppNotification {
   storeId?: string;
   /** Notificações administrativas ficam separadas das notificações destinadas ao cliente. */
   audience?: 'admin' | 'client';
+  /** Área do app relacionada (usada para os contadores/badges dos botões). */
+  category?: 'servico' | 'visita' | 'orcamento' | 'obra' | 'pagamento' | 'comprovante' | 'empresa';
+  /** Visita relacionada, quando houver. */
+  visitaId?: string;
 }
 
 export interface GeneratedReceipt {

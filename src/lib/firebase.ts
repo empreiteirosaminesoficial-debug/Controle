@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDocFromServer, Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, doc, getDocFromServer, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -19,9 +19,21 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 const dbId = (firebaseConfig as Record<string, any>).firestoreDatabaseId;
-export const db: Firestore = dbId
-  ? getFirestore(app, dbId)
-  : getFirestore(app);
+// ignoreUndefinedProperties: campos opcionais vazios (ex.: dueDate, notes, serviceId)
+// chegam como `undefined`. Sem esta opção o Firestore rejeita o documento inteiro
+// ("Unsupported field value: undefined") e o serviço/notificação nunca é gravado.
+function createFirestore(): Firestore {
+  try {
+    return dbId
+      ? initializeFirestore(app, { ignoreUndefinedProperties: true }, dbId)
+      : initializeFirestore(app, { ignoreUndefinedProperties: true });
+  } catch {
+    // Já inicializado (ex.: hot reload do Vite) — reutiliza a instância existente.
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+  }
+}
+
+export const db: Firestore = createFirestore();
 
 // Inicializa o Firebase Storage para uploads de mídia e backups comprimidos
 export const storage: FirebaseStorage = getStorage(app);

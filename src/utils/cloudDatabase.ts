@@ -27,6 +27,19 @@ import {
   ObraRecord,
   VisitaRecord
 } from '../types';
+import {
+  cleanForFirestore,
+  markPendingUpsert,
+  markPendingDelete,
+  clearPendingUpsert,
+  clearPendingDelete,
+  getPendingWrites,
+  mergeWithPendingWrites,
+  isInitialUploadDone,
+  setInitialUploadDone,
+  describeFirestoreError,
+  type OutboxCollection,
+} from './cloudOutbox';
 import { 
   loadAuthSettings, 
   loadServices, 
@@ -59,6 +72,136 @@ const PROFILES_COLLECTION = 'userProfiles';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 const OBRAS_COLLECTION = 'obras';
 const VISITAS_COLLECTION = 'visitas';
+
+const OUTBOX_TO_FIRESTORE: Record<OutboxCollection, string> = {
+  services: SERVICES_COLLECTION,
+  obras: OBRAS_COLLECTION,
+  visitas: VISITAS_COLLECTION,
+};
+
+/** Última falha de gravação, em linguagem simples, para exibir ao usuário. */
+let lastCloudWriteError: string | null = null;
+export function getLastCloudWriteError(): string | null {
+  return lastCloudWriteError;
+}
+
+let flushInProgress: Promise<{ sent: number; failed: number }> | null = null;
+
+/**
+ * Reenvia ao Firestore todas as gravações/exclusões que ficaram na fila local.
+ * Seguro para chamar várias vezes (execuções simultâneas são unificadas).
+ */
+export function flushCloudOutbox(
+  collections: OutboxCollection[] = ['services', 'obras', 'visitas']
+): Promise<{ sent: number; failed: number }> {
+  if (flushInProgress) return flushInProgress;
+  flushInProgress = (async () => {
+    let sent = 0;
+    let failed = 0;
+    if (!auth.currentUser || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      return { sent, failed };
+    }
+    for (const name of collections) {
+      const collectionName = OUTBOX_TO_FIRESTORE[name];
+      const pending = getPendingWrites(name);
+      for (const record of pending.upserts) {
+        if (!record?.id) continue;
+        try {
+          await setDoc(doc(db, collectionName, record.id), cleanForFirestore(record), { merge: true });
+          clearPendingUpsert(name, record);
+          sent++;
+        } catch (err) {
+          failed++;
+          lastCloudWriteError = describeFirestoreError(err);
+          console.warn(`[CloudOutbox] Reenvio pendente falhou (${name}/${record.id}):`, err);
+        }
+      }
+      for (const id of pending.deletes) {
+        try {
+          await deleteDoc(doc(db, collectionName, id));
+          clearPendingDelete(name, id);
+          sent++;
+        } catch (err) {
+          failed++;
+          lastCloudWriteError = describeFirestoreError(err);
+          console.warn(`[CloudOutbox] Exclusão pendente falhou (${name}/${id}):`, err);
+        }
+      }
+    }
+    if (failed === 0 && sent > 0) lastCloudWriteError = null;
+    return { sent, failed };
+  })().finally(() => {
+    flushInProgress = null;
+  });
+  return flushInProgress;
+}
+
+/**
+ * Concilia uma coleção local (cache do ADM) com o Firestore.
+ *
+ * Regra: a nuvem é a fonte da verdade. Itens locais só são enviados quando
+ * estão na fila de pendências — assim um serviço excluído em outro aparelho
+ * não "ressuscita" ao abrir o app neste. Na primeira execução desta versão,
+ * itens que existem só no cache local (por exemplo, serviços que nunca
+ * subiram por causa do erro de campos `undefined`) entram na fila uma vez,
+ * para que nada criado antes da correção seja perdido.
+ */
+async function reconcileCollection<T extends { id: string; updatedAt?: string; createdAt?: string }>(
+  name: OutboxCollection,
+  localItems: T[]
+): Promise<{ merged: T[]; uploaded: number; downloaded: number } | null> {
+  const collectionName = OUTBOX_TO_FIRESTORE[name];
+  const remoteSnap = await getDocs(collection(db, collectionName)).catch((err) => {
+    console.warn(`[CloudDatabase] Não foi possível ler ${collectionName}; cache local mantido:`, err);
+    return null;
+  });
+  if (!remoteSnap) return null;
+
+  const remoteMap = new Map<string, T>();
+  remoteSnap.forEach((d) => {
+    const item = d.data() as T;
+    if (item?.id) remoteMap.set(item.id, item);
+  });
+
+  if (!isInitialUploadDone(name)) {
+    localItems.forEach((item) => {
+      if (!item?.id) return;
+      const remote = remoteMap.get(item.id);
+      const localTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+      const remoteTime = remote ? new Date(remote.updatedAt || remote.createdAt || 0).getTime() : 0;
+      if (!remote || localTime > remoteTime) markPendingUpsert(name, item);
+    });
+  }
+
+  const before = getPendingWrites(name);
+  const result = await flushCloudOutbox([name]);
+  if (!isInitialUploadDone(name) && result.failed === 0) setInitialUploadDone(name);
+
+  // Reflete no mapa remoto o que acabou de ser confirmado.
+  const stillPending = getPendingWrites(name);
+  const stillPendingUpserts = new Set(stillPending.upserts.map((item: any) => item.id));
+  const stillPendingDeletes = new Set(stillPending.deletes);
+  before.upserts.forEach((item: any) => {
+    if (item?.id && !stillPendingUpserts.has(item.id)) remoteMap.set(item.id, item);
+  });
+  before.deletes.forEach((id) => {
+    if (!stillPendingDeletes.has(id)) remoteMap.delete(id);
+  });
+
+  const merged = mergeWithPendingWrites(name, [...remoteMap.values()]);
+  const localById = new Map(localItems.map((item) => [item.id, item]));
+  let downloaded = 0;
+  merged.forEach((item) => {
+    const local = localById.get(item.id);
+    if (!local || (local.updatedAt || '') !== (item.updatedAt || '')) downloaded++;
+  });
+  const mergedIds = new Set(merged.map((item) => item.id));
+  localItems.forEach((item) => {
+    if (!mergedIds.has(item.id)) downloaded++;
+  });
+
+  return { merged, uploaded: result.sent, downloaded };
+}
 
 /**
  * Verifica o status da conexão em tempo real com o banco de dados Firebase Firestore
@@ -437,56 +580,11 @@ export async function syncWithCloudDatabase(): Promise<{
     let uploadedCount = 0;
     let downloadedCount = 0;
 
-    // Busca serviços remotos da coleção /services
-    const remoteServicesSnap = await getDocs(collection(db, SERVICES_COLLECTION)).catch(() => null);
-    const remoteServicesMap = new Map<string, ServiceRecord>();
-
-    if (remoteServicesSnap && !remoteServicesSnap.empty) {
-      remoteServicesSnap.forEach((d) => {
-        const s = d.data() as ServiceRecord;
-        if (s.id) remoteServicesMap.set(s.id, s);
-      });
-    }
-
-    // Mesclagem com regra de timestamp mais recente
-    const mergedServices: ServiceRecord[] = [...localServices];
-
-    // Verifica serviços remotos que não estão no local ou são mais novos
-    remoteServicesMap.forEach((remoteService, id) => {
-      const localIndex = mergedServices.findIndex((s) => s.id === id);
-      if (localIndex === -1) {
-        mergedServices.push(remoteService);
-        downloadedCount++;
-      } else {
-        const localService = mergedServices[localIndex];
-        const localTime = new Date(localService.updatedAt || localService.createdAt || 0).getTime();
-        const remoteTime = new Date(remoteService.updatedAt || remoteService.createdAt || 0).getTime();
-        if (remoteTime > localTime) {
-          mergedServices[localIndex] = remoteService;
-          downloadedCount++;
-        }
-      }
-    });
-
-    // Envia serviços locais para a nuvem
-    for (const service of localServices) {
-      const remote = remoteServicesMap.get(service.id);
-      const localTime = new Date(service.updatedAt || service.createdAt || 0).getTime();
-      const remoteTime = remote ? new Date(remote.updatedAt || remote.createdAt || 0).getTime() : 0;
-
-      if (!remote || localTime > remoteTime) {
-        // Envia para o Firestore
-        await setDoc(doc(db, SERVICES_COLLECTION, service.id), {
-          ...service,
-          updatedAt: service.updatedAt || new Date().toISOString(),
-        }, { merge: true });
-        uploadedCount++;
-      }
-    }
-
-    // Salva serviços consolidados localmente se houve novidades
-    if (downloadedCount > 0) {
-      saveServices(mergedServices);
+    const servicesResult = await reconcileCollection<ServiceRecord>('services', localServices);
+    if (servicesResult) {
+      uploadedCount += servicesResult.uploaded;
+      downloadedCount += servicesResult.downloaded;
+      saveServices(servicesResult.merged);
     }
 
     // 3. Sincroniza Lojas / Clientes
@@ -607,83 +705,21 @@ export async function syncWithCloudDatabase(): Promise<{
     mergedNotifs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     saveNotifications(mergedNotifs);
 
-    // 6. Sincroniza Obras
-    const localObras = loadObras();
-    const remoteObrasSnap = await getDocs(collection(db, OBRAS_COLLECTION)).catch(() => null);
-    const remoteObrasMap = new Map<string, ObraRecord>();
-
-    if (remoteObrasSnap && !remoteObrasSnap.empty) {
-      remoteObrasSnap.forEach((d) => {
-        const obra = d.data() as ObraRecord;
-        if (obra.id) remoteObrasMap.set(obra.id, obra);
-      });
+    // 6. Sincroniza Obras (nuvem como fonte da verdade + fila de pendências)
+    const obrasResult = await reconcileCollection<ObraRecord>('obras', loadObras());
+    if (obrasResult) {
+      uploadedCount += obrasResult.uploaded;
+      downloadedCount += obrasResult.downloaded;
+      saveObras(obrasResult.merged);
     }
 
-    const mergedObras: ObraRecord[] = [...localObras];
-    remoteObrasMap.forEach((remoteObra, id) => {
-      const localIdx = mergedObras.findIndex((o) => o.id === id);
-      if (localIdx === -1) {
-        mergedObras.push(remoteObra);
-        downloadedCount++;
-      } else {
-        const localTime = new Date(mergedObras[localIdx].updatedAt || 0).getTime();
-        const remoteTime = new Date(remoteObra.updatedAt || 0).getTime();
-        if (remoteTime > localTime) {
-          mergedObras[localIdx] = remoteObra;
-          downloadedCount++;
-        }
-      }
-    });
-
-    for (const obra of localObras) {
-      const remote = remoteObrasMap.get(obra.id);
-      const localTime = new Date(obra.updatedAt || 0).getTime();
-      const remoteTime = remote ? new Date(remote.updatedAt || 0).getTime() : 0;
-      if (!remote || localTime > remoteTime) {
-        await setDoc(doc(db, OBRAS_COLLECTION, obra.id), obra, { merge: true }).catch(() => {});
-        uploadedCount++;
-      }
+    // 7. Sincroniza Visitas Técnicas (inclui solicitações enviadas pelos clientes)
+    const visitasResult = await reconcileCollection<VisitaRecord>('visitas', loadVisitas());
+    if (visitasResult) {
+      uploadedCount += visitasResult.uploaded;
+      downloadedCount += visitasResult.downloaded;
+      saveVisitas(visitasResult.merged);
     }
-    saveObras(mergedObras);
-
-    // 7. Sincroniza Visitas Técnicas
-    const localVisitas = loadVisitas();
-    const remoteVisitasSnap = await getDocs(collection(db, VISITAS_COLLECTION)).catch(() => null);
-    const remoteVisitasMap = new Map<string, VisitaRecord>();
-
-    if (remoteVisitasSnap && !remoteVisitasSnap.empty) {
-      remoteVisitasSnap.forEach((d) => {
-        const visita = d.data() as VisitaRecord;
-        if (visita.id) remoteVisitasMap.set(visita.id, visita);
-      });
-    }
-
-    const mergedVisitas: VisitaRecord[] = [...localVisitas];
-    remoteVisitasMap.forEach((remoteVisita, id) => {
-      const localIdx = mergedVisitas.findIndex((v) => v.id === id);
-      if (localIdx === -1) {
-        mergedVisitas.push(remoteVisita);
-        downloadedCount++;
-      } else {
-        const localTime = new Date(mergedVisitas[localIdx].updatedAt || 0).getTime();
-        const remoteTime = new Date(remoteVisita.updatedAt || 0).getTime();
-        if (remoteTime > localTime) {
-          mergedVisitas[localIdx] = remoteVisita;
-          downloadedCount++;
-        }
-      }
-    });
-
-    for (const visita of localVisitas) {
-      const remote = remoteVisitasMap.get(visita.id);
-      const localTime = new Date(visita.updatedAt || 0).getTime();
-      const remoteTime = remote ? new Date(remote.updatedAt || 0).getTime() : 0;
-      if (!remote || localTime > remoteTime) {
-        await setDoc(doc(db, VISITAS_COLLECTION, visita.id), visita, { merge: true }).catch(() => {});
-        uploadedCount++;
-      }
-    }
-    saveVisitas(mergedVisitas);
 
     // Atualiza o registro de sincronização
     const now = new Date().toISOString();
@@ -867,14 +903,20 @@ export function listenCloudStores(callback: (stores: StoreProfile[]) => void): U
  */
 export async function saveCloudService(service: ServiceRecord): Promise<boolean> {
   if (!service || !service.id || !service.storeId) return false;
+  const record = cleanForFirestore({
+    ...service,
+    updatedAt: service.updatedAt || new Date().toISOString(),
+  }) as ServiceRecord;
+  // Registra antes de enviar: se a página recarregar ou a rede cair, o envio é refeito.
+  markPendingUpsert('services', record);
   try {
-    await setDoc(doc(db, SERVICES_COLLECTION, service.id), {
-      ...service,
-      updatedAt: service.updatedAt || new Date().toISOString(),
-    }, { merge: true });
+    await setDoc(doc(db, SERVICES_COLLECTION, record.id), record, { merge: true });
+    clearPendingUpsert('services', record);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao salvar serviço no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao salvar serviço no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
@@ -884,11 +926,15 @@ export async function saveCloudService(service: ServiceRecord): Promise<boolean>
  */
 export async function deleteCloudService(serviceId: string): Promise<boolean> {
   if (!serviceId) return false;
+  markPendingDelete('services', serviceId);
   try {
     await deleteDoc(doc(db, SERVICES_COLLECTION, serviceId));
+    clearPendingDelete('services', serviceId);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao excluir serviço no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao excluir serviço no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
@@ -933,7 +979,7 @@ export function listenCloudServices(callback: (services: ServiceRecord[]) => voi
 export async function saveCloudNotification(notification: AppNotification): Promise<boolean> {
   if (!notification || !notification.id) return false;
   try {
-    await setDoc(doc(db, NOTIFICATIONS_COLLECTION, notification.id), notification, { merge: true });
+    await setDoc(doc(db, NOTIFICATIONS_COLLECTION, notification.id), cleanForFirestore(notification), { merge: true });
     return true;
   } catch (err) {
     console.warn('[CloudDatabase] Aviso ao salvar notificação no Firestore:', err);
@@ -1178,14 +1224,20 @@ export function listenClientNotifications(
 }
 export async function saveCloudObra(obra: ObraRecord): Promise<boolean> {
   if (!obra || !obra.id || !obra.storeId) return false;
+  const record = cleanForFirestore({
+    ...obra,
+    updatedAt: obra.updatedAt || new Date().toISOString(),
+  }) as ObraRecord;
+  // Registra antes de enviar: se a página recarregar ou a rede cair, o envio é refeito.
+  markPendingUpsert('obras', record);
   try {
-    await setDoc(doc(db, OBRAS_COLLECTION, obra.id), {
-      ...obra,
-      updatedAt: obra.updatedAt || new Date().toISOString(),
-    }, { merge: true });
+    await setDoc(doc(db, OBRAS_COLLECTION, record.id), record, { merge: true });
+    clearPendingUpsert('obras', record);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao salvar obra no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao salvar obra no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
@@ -1211,14 +1263,20 @@ export function listenCloudObras(callback: (obras: ObraRecord[]) => void): Unsub
  */
 export async function saveCloudVisita(visita: VisitaRecord): Promise<boolean> {
   if (!visita || !visita.id || !visita.storeId) return false;
+  const record = cleanForFirestore({
+    ...visita,
+    updatedAt: visita.updatedAt || new Date().toISOString(),
+  }) as VisitaRecord;
+  // Registra antes de enviar: se a página recarregar ou a rede cair, o envio é refeito.
+  markPendingUpsert('visitas', record);
   try {
-    await setDoc(doc(db, VISITAS_COLLECTION, visita.id), {
-      ...visita,
-      updatedAt: visita.updatedAt || new Date().toISOString(),
-    }, { merge: true });
+    await setDoc(doc(db, VISITAS_COLLECTION, record.id), record, { merge: true });
+    clearPendingUpsert('visitas', record);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao salvar visita no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao salvar visita no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
@@ -1244,11 +1302,15 @@ export function listenCloudVisitas(callback: (visitas: VisitaRecord[]) => void):
  */
 export async function deleteCloudObra(obraId: string): Promise<boolean> {
   if (!obraId) return false;
+  markPendingDelete('obras', obraId);
   try {
     await deleteDoc(doc(db, OBRAS_COLLECTION, obraId));
+    clearPendingDelete('obras', obraId);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao deletar obra no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao excluir obra no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
@@ -1276,11 +1338,15 @@ export async function fetchCloudObras(): Promise<ObraRecord[]> {
  */
 export async function deleteCloudVisita(visitaId: string): Promise<boolean> {
   if (!visitaId) return false;
+  markPendingDelete('visitas', visitaId);
   try {
     await deleteDoc(doc(db, VISITAS_COLLECTION, visitaId));
+    clearPendingDelete('visitas', visitaId);
+    lastCloudWriteError = null;
     return true;
   } catch (err) {
-    console.warn('[CloudDatabase] Aviso ao deletar visita no Firestore:', err);
+    lastCloudWriteError = describeFirestoreError(err);
+    console.warn('[CloudDatabase] Falha ao excluir visita no Firestore (mantido na fila de reenvio):', err);
     return false;
   }
 }
