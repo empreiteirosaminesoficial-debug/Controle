@@ -117,6 +117,7 @@ import {
 } from './utils/cloudDatabase';
 import { mergeWithPendingWrites, countPendingWrites } from './utils/cloudOutbox';
 import { uploadClientBackupToDrive } from './utils/googleDriveBackup';
+import { registerInstallment } from './utils/consolidatedReceipt';
 
 // Components
 import { Navbar } from './components/Navbar';
@@ -1580,6 +1581,19 @@ export default function App() {
     setIsPaymentModalOpen(true);
   };
 
+  const notifyConsolidatedReceipt = (service: ServiceRecord) => {
+    if (!service.consolidatedReceipt) return;
+    void addNotificationRecord({
+      title: 'Serviço quitado — comprovante disponível 🧾',
+      body: `"${service.serviceTitle || service.description}" foi quitado (${formatCurrency(service.consolidatedReceipt.totalPaid)}). O comprovante consolidado com todas as parcelas está em Comprovantes.`,
+      type: 'comprovante',
+      serviceId: service.id,
+      storeId: service.storeId,
+      category: 'comprovante',
+      dedupeId: `notif_quitacao_${service.id}`,
+    });
+  };
+
   const handleConfirmPayment = (
     service: ServiceRecord,
     paymentAmount: number,
@@ -1595,9 +1609,10 @@ export default function App() {
 
     const newStatus: PaymentStatus = isPaidInFull ? 'pago' : 'parcial';
 
+    let consolidatedCreated = false;
     const updatedList = services.map((s) => {
       if (s.id === service.id) {
-        return {
+        const base: ServiceRecord = {
           ...s,
           valuePaid: newPaidTotal,
           paymentStatus: newStatus,
@@ -1605,6 +1620,10 @@ export default function App() {
           paidDate: isPaidInFull ? paymentDate : s.paidDate,
           updatedAt: new Date().toISOString(),
         };
+        // Histórico de parcelas + comprovante consolidado automático na quitação.
+        const result = registerInstallment(base, { amount: paymentAmount, method, date: paymentDate });
+        consolidatedCreated = result.consolidatedCreated;
+        return result.service;
       }
       return s;
     });
@@ -1612,6 +1631,7 @@ export default function App() {
     setServices(updatedList);
     const updated = updatedList.find(s => s.id === service.id);
     if (updated) saveCloudService(updated).catch(() => {});
+    if (updated && consolidatedCreated) notifyConsolidatedReceipt(updated);
 
 
     // Celebration confetti
@@ -2944,7 +2964,16 @@ export default function App() {
         stores={stores}
         currentUser={user}
         preSelectedServiceId={preSelectedReceiptServiceId}
-        onReceiptGenerated={({ receipt, updatedService, notificationMessage }) => {
+        onReceiptGenerated={({ receipt, updatedService: serviceFromModal, notificationMessage }) => {
+          // Registra a parcela no histórico; na quitação anexa o comprovante consolidado.
+          const { service: updatedService, consolidatedCreated } = registerInstallment(serviceFromModal, {
+            amount: receipt.amountReceived,
+            method: receipt.paymentMethod,
+            date: (receipt.paymentDate || '').split('T')[0],
+            receiptNumber: receipt.receiptNumber,
+            note: receipt.notes,
+          });
+          if (consolidatedCreated) notifyConsolidatedReceipt(updatedService);
           // Atualiza o serviço no sistema
           setServices((prev) =>
             prev.map((s) => (s.id === updatedService.id ? updatedService : s))

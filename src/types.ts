@@ -35,6 +35,30 @@ export interface ServiceRecord {
   photos: ServicePhoto[];
   createdAt: string;
   updatedAt: string;
+  /** Histórico de parcelas/pagamentos recebidos (sincronizado com o cliente). */
+  paymentHistory?: PaymentInstallment[];
+  /** Comprovante consolidado gerado automaticamente na quitação. */
+  consolidatedReceipt?: ConsolidatedReceipt;
+}
+
+export interface PaymentInstallment {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  method: PaymentMethod;
+  receiptNumber?: string;
+  note?: string;
+  recordedAt: string;
+}
+
+export interface ConsolidatedReceipt {
+  receiptNumber: string;
+  generatedAt: string;
+  paidDate: string;
+  totalCharged: number;
+  totalDebit: number;
+  totalPaid: number;
+  installments: PaymentInstallment[];
 }
 
 export type DocumentType = 'CNPJ' | 'CPF';

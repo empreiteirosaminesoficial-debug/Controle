@@ -36,11 +36,49 @@
 - [ ] ADM gera comprovante → cliente recebe aviso e contador em Comprovantes.
 - [ ] Toque uma vez na tela do cliente após abrir o app (destrava o som).
 
+## Etapas seguintes (mesmo dia)
+
+### Cadastro, CPF/CNPJ e permissões
+- Cliente que perde todos os estabelecimentos **não é desconectado**: vê
+  "Nenhum estabelecimento liberado" e o acesso volta sozinho quando o ADM
+  vincular uma loja (a solicitação continua aprovada, sem voltar a pendente).
+- Sem internet, os dados já autorizados continuam na tela.
+- Ações administrativas bloqueadas também no código para o perfil cliente.
+- Já existiam e foram mantidos: um CPF e vários CNPJs por perfil, tela de espera,
+  liberação automática, aviso de rejeição, aprovação/rejeição pelo ADM.
+
+### Backup
+- ADM: se o backup das 04:00 não rodou (app fechado), roda ao abrir o app.
+- Cliente: backup automático diário no Google Drive dele (usa a autorização já
+  concedida; se não houver, o cliente faz o primeiro backup manual e autoriza).
+
+### Interface, APK e PWA
+- Removidos os restos de Sincronização/Exportação/Baixar Código.
+- APK baixa por link direto do Storage (não depende de CORS).
+- Service worker não guarda arquivos de outros domínios; versão de cache nova.
+
+### Comprovante consolidado
+- Cada pagamento vira uma parcela registrada no serviço (sincroniza com o cliente).
+- Na quitação, o comprovante consolidado é gerado automaticamente, o cliente é
+  avisado e pode abrir/imprimir/salvar em PDF em Comprovantes.
+- Valores pagos antes desta versão aparecem como "Pagamentos anteriores".
+
+### Testar também
+- [ ] Remover a única loja de um cliente → tela "Nenhum estabelecimento liberado";
+      vincular de novo → acesso volta sozinho.
+- [ ] Desligar a internet no cliente → dados continuam visíveis.
+- [ ] Pagamento parcial e depois quitação → comprovante consolidado no cliente.
+- [ ] Baixar o APK pelo cliente em Nossa Empresa.
+- [ ] Abrir o app do ADM depois das 04:00 → backup do dia é feito.
+
 ## Observações
 - Na primeira abertura desta versão pelo ADM, serviços/obras/visitas que existiam
   só no aparelho dele são enviados uma única vez ao Firebase.
 - Fotos são guardadas dentro do registro do serviço; o Firebase limita cada
   registro a 1 MB. Muitas fotos num mesmo serviço podem impedir a gravação
   (o ADM recebe um aviso). Solução definitiva: mover fotos para o Firebase Storage.
-- Pendências da lista original ainda não tratadas: itens 3 a 11 (CPF/CNPJ e
-  aprovação, backup 04:00, APK, ajustes de interface, PWA, comprovante consolidado).
+- Um app web não roda às 04:00 com o aparelho/app fechado; para backup exato
+  nesse horário é preciso uma Cloud Function agendada (plano Blaze do Firebase).
+- Não foi possível rodar `npm install`/`npm run build` neste ambiente (sem
+  internet). Verificado: checagem de tipos sem erros novos, empacotamento com
+  esbuild e testes da fila de reenvio e do comprovante consolidado.

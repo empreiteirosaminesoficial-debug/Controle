@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ServicePhoto, ServiceRecord, StoreProfile } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { getInstallmentsWithLegacy, openConsolidatedReceipt } from '../../utils/consolidatedReceipt';
 
 interface ComprovantesPageProps {
   services: ServiceRecord[];
@@ -100,8 +101,89 @@ export const ComprovantesPage: React.FC<ComprovantesPageProps> = ({
   const receiptsCount = allProofItems.filter(i => i.isReceipt).length;
   const photosCount = allProofItems.filter(i => !i.isReceipt).length;
 
+  // Serviços com parcelas registradas ou comprovante de quitação.
+  const paymentServices = services
+    .filter((s) => s.consolidatedReceipt || (s.paymentHistory && s.paymentHistory.length > 0))
+    .sort((a, b) => (b.consolidatedReceipt?.generatedAt || b.updatedAt || '').localeCompare(a.consolidatedReceipt?.generatedAt || a.updatedAt || ''));
+  const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
+
   return (
     <div className="space-y-6">
+      {paymentServices.length > 0 && (
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-700 text-white rounded-xl shadow-xs">
+              <FileCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Parcelas e comprovantes de quitação</h3>
+              <p className="text-xs text-slate-500">Histórico de pagamentos por serviço. Ao quitar, o comprovante consolidado é gerado automaticamente.</p>
+            </div>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {paymentServices.map((service) => {
+              const installments = getInstallmentsWithLegacy(service);
+              const due = (service.valueCharged || 0) + (service.valueDebit || 0);
+              const remaining = Math.max(0, due - (service.valuePaid || 0));
+              const expanded = expandedServiceId === service.id;
+              return (
+                <li key={service.id} className="py-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedServiceId(expanded ? null : service.id)}
+                      className="text-left min-w-0 cursor-pointer"
+                    >
+                      <p className="text-sm font-bold text-slate-800 truncate">{service.serviceTitle || service.description}</p>
+                      <p className="text-xs text-slate-500">
+                        {service.storeName} · {installments.length} parcela(s) · pago {formatCurrency(service.valuePaid || 0)} de {formatCurrency(due)}
+                        {remaining > 0.009 ? ` · falta ${formatCurrency(remaining)}` : ''}
+                      </p>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {service.consolidatedReceipt ? (
+                        <button
+                          type="button"
+                          onClick={() => openConsolidatedReceipt(service)}
+                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Comprovante de quitação
+                        </button>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold uppercase">Em aberto</span>
+                      )}
+                    </div>
+                  </div>
+                  {expanded && (
+                    <table className="mt-2 w-full text-xs">
+                      <thead>
+                        <tr className="text-slate-500 text-left">
+                          <th className="py-1 pr-2">Data</th>
+                          <th className="py-1 pr-2">Forma</th>
+                          <th className="py-1 pr-2">Recibo</th>
+                          <th className="py-1 text-right">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {installments.map((item) => (
+                          <tr key={item.id} className="border-t border-slate-100">
+                            <td className="py-1 pr-2">{item.date.split('-').reverse().join('/')}</td>
+                            <td className="py-1 pr-2 uppercase">{item.method}</td>
+                            <td className="py-1 pr-2">{item.receiptNumber || (item.note ? <span className="text-slate-400">{item.note}</span> : '—')}</td>
+                            <td className="py-1 text-right font-bold">{formatCurrency(item.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
