@@ -1,5 +1,5 @@
 import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore';
-import { getBytes, ref, uploadBytes } from 'firebase/storage';
+import { getBytes, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
 
 export interface ApkReleaseInfo {
@@ -74,7 +74,24 @@ export async function downloadPublishedApk(release: ApkReleaseInfo): Promise<voi
   if (!auth.currentUser) throw new Error('Entre na sua conta para baixar o aplicativo.');
   if (!release?.storagePath || !release.fileName) throw new Error('Não há APK publicado para baixar.');
 
-  const bytes = await getBytes(ref(storage, release.storagePath), MAX_APK_SIZE);
+  const fileRef = ref(storage, release.storagePath);
+  // Preferência: link direto do Firebase Storage. Uma navegação comum não depende
+  // de CORS no bucket (getBytes depende, e falhava em navegadores sem essa configuração).
+  try {
+    const url = await getDownloadURL(fileRef);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = release.fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return;
+  } catch (error) {
+    console.warn('[APK] Link direto indisponível; tentando download pelo SDK:', error);
+  }
+
+  const bytes = await getBytes(fileRef, MAX_APK_SIZE);
   const blob = new Blob([bytes], { type: 'application/vnd.android.package-archive' });
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

@@ -3,7 +3,7 @@
  * Empreiteiro Saminês
  */
 
-const CACHE_NAME = 'samines-pwa-v7.0.0-logo-20261026';
+const CACHE_NAME = 'samines-pwa-v7.1.0-sync-20261127';
 
 // Arquivos estáticos essenciais pré-carregados para funcionamento offline e novos ícones
 const PRECACHE_ASSETS = [
@@ -92,6 +92,14 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(event.request.url);
+
+  const isGoogleFonts = url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com');
+
+  // Outros domínios (Firebase Storage/APK, APIs Google etc.) vão direto à rede:
+  // evita guardar no cache arquivos grandes como o APK.
+  if (url.origin !== self.location.origin && !isGoogleFonts) {
+    return;
+  }
 
   // Não intercepta chamadas externas ou APIs do Firebase / Google
   if (

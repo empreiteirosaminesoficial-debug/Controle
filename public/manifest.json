@@ -10,7 +10,11 @@
   "background_color": "#ffffff",
   "theme_color": "#15803d",
   "lang": "pt-BR",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/favicon-32.png?v=20261026",
@@ -85,18 +89,6 @@
       "short_name": "Novo",
       "description": "Registrar um novo serviço ou obra",
       "url": "/?action=new-service",
-      "icons": [
-        {
-          "src": "/logo-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Sincronização Firestore",
-      "short_name": "Sincronizar",
-      "description": "Sincronizar com banco de dados em nuvem Google",
-      "url": "/?action=sync",
       "icons": [
         {
           "src": "/logo-192.png",

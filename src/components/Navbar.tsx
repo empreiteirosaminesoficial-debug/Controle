@@ -27,10 +27,8 @@ interface NavbarProps {
   syncStatus: SyncStatus;
   currentPage?: AppPage;
   onPageChange?: (page: AppPage) => void;
-  onOpenAutoSync: () => void;
   onOpenNewService?: () => void;
   onOpenStoresModal: () => void;
-  onOpenExportModal: () => void;
   onOpenGoogleAuth: () => void;
   onOpenNotifications: () => void;
   onRequestPermission: () => void;
@@ -49,10 +47,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   syncStatus,
   currentPage = 'dashboard',
   onPageChange,
-  onOpenAutoSync,
   onOpenNewService,
   onOpenStoresModal,
-  onOpenExportModal,
   onOpenGoogleAuth,
   onOpenNotifications,
   onRequestPermission,

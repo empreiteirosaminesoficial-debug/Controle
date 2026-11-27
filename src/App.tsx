@@ -2275,10 +2275,8 @@ export default function App() {
         syncStatus={syncStatus}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
-        onOpenAutoSync={() => setIsAutoSyncModalOpen(true)}
         onOpenNewService={handleOpenNewService}
         onOpenStoresModal={() => setIsStoreModalOpen(true)}
-        onOpenExportModal={() => setIsExportModalOpen(true)}
         onOpenGoogleAuth={() => setIsGoogleAuthModalOpen(true)}
         onOpenNotifications={() => setIsNotificationModalOpen(true)}
         onRequestPermission={handleRequestPermission}
