@@ -199,7 +199,9 @@ export const AccessRequestsManager: React.FC<AccessRequestsManagerProps> = ({ st
         const remainingIds = currentIds.filter((id) => id !== storeId);
         transaction.delete(memberRef);
         transaction.update(requestRef, {
-          status: remainingIds.length > 0 ? 'approved' : 'pending',
+          // Mantém o cadastro aprovado mesmo sem lojas: o cliente fica bloqueado
+          // (tela "nenhum estabelecimento liberado"), mas não volta à fila de pendentes.
+          status: 'approved',
           storeIds: remainingIds,
           reviewedBy: current.uid,
           reviewedAt: serverTimestamp(),

@@ -208,7 +208,7 @@ export default function App() {
   // do cliente só porque o array foi recriado com o mesmo conteúdo.
   const authorizedStoreKey = [...new Set(user?.authorizedStoreIds || [])].filter(Boolean).sort().join('|');
   const [authReady, setAuthReady] = useState(false);
-  const [accessApprovalStatus, setAccessApprovalStatus] = useState<'none' | 'pending' | 'checking' | 'rejected'>('none');
+  const [accessApprovalStatus, setAccessApprovalStatus] = useState<'none' | 'pending' | 'checking' | 'rejected' | 'no_stores'>('none');
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine
   );
@@ -342,8 +342,10 @@ export default function App() {
               approvedResult.profile.status !== 'active' ||
               !(approvedResult.profile.authorizedStoreIds || []).length
             ) {
+              // Aprovado, mas sem nenhum estabelecimento ativo: cadastro mantido, acesso bloqueado.
               setAccessApprovalStatus(
-                approvedResult.profile?.status === 'blocked' ? 'rejected' : 'checking'
+                approvedResult.profile?.status === 'blocked' ? 'rejected'
+                  : approvedResult.success ? 'no_stores' : 'checking'
               );
               return;
             }
@@ -355,7 +357,7 @@ export default function App() {
             if (!active || eventId !== authEventId || auth.currentUser?.uid !== firebaseUser.uid) return;
 
             if (clientData.stores.length === 0) {
-              setAccessApprovalStatus('checking');
+              setAccessApprovalStatus('no_stores');
               return;
             }
 
@@ -455,7 +457,12 @@ export default function App() {
           setNotifications([]);
           setUser(result.profile);
         } else if (result.success && result.profile?.role === 'client') {
-          setAccessApprovalStatus(result.profile.status === 'blocked' ? 'rejected' : 'pending');
+          const alreadyReviewed = (result as { isNewAccount?: boolean }).isNewAccount === false;
+          setAccessApprovalStatus(
+            result.profile.status === 'blocked' ? 'rejected'
+              : alreadyReviewed ? 'no_stores'
+              : 'pending'
+          );
           observeClientApproval(firebaseUser, currentEventId);
         }
       } catch (error) {
@@ -489,11 +496,14 @@ export default function App() {
     let refreshing = false;
     let refreshPending = false;
 
+    // Sem nenhum estabelecimento autorizado: remove os dados da memória, mas NÃO
+    // encerra a conta. A sessão é reavaliada e o cliente vê a tela "sem
+    // estabelecimentos"; o acesso volta sozinho quando o ADM vincular uma loja.
     const clearAndLogout = () => {
       if (!active || auth.currentUser?.uid !== uid) return;
       setServices([]); setStores([]); setNotifications([]); setObras([]); setVisitas([]);
       setUser(null);
-      void executeGoogleLogout();
+      window.location.reload();
     };
 
     const refreshAuthorization = async () => {
@@ -519,20 +529,21 @@ export default function App() {
             ? { ...previous, authorizedStoreIds: validIds }
             : previous);
         } catch (error) {
-          // Falha de servidor/conexão: ocultar dados do cliente até nova confirmação.
-          if (active && auth.currentUser?.uid === uid) {
+          // Permissão negada = vínculo revogado: oculta os dados. Falha de rede/servidor
+          // apenas mantém o que já estava autorizado na tela (persistência no celular).
+          const code = (error as { code?: string })?.code || '';
+          if (active && auth.currentUser?.uid === uid && code.includes('permission-denied')) {
             setServices([]); setStores([]); setNotifications([]); setObras([]); setVisitas([]);
           }
-          console.warn('[ClientAccess] Falha ao atualizar vínculos autorizados; dados ocultados:', error);
+          console.warn('[ClientAccess] Falha ao atualizar vínculos autorizados:', error);
         }
       } while (refreshPending && active);
       refreshing = false;
     };
 
-    const handleOffline = () => {
-      if (!active || auth.currentUser?.uid !== uid) return;
-      setServices([]); setStores([]); setNotifications([]); setObras([]); setVisitas([]);
-    };
+    // Sem conexão: mantém os dados já autorizados visíveis; revogações são
+    // aplicadas assim que a conexão voltar (handleOnline → refreshAuthorization).
+    const handleOffline = () => {};
     const handleOnline = () => { void refreshAuthorization(); };
     window.addEventListener('offline', handleOffline);
     window.addEventListener('online', handleOnline);
@@ -1345,6 +1356,8 @@ export default function App() {
   };
 
   const handleSaveService = (serviceData: Partial<ServiceRecord>) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     if (serviceToEdit) {
       // Edit existing
@@ -1432,6 +1445,8 @@ export default function App() {
   };
 
   const handleDeleteService = (serviceId: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const target = services.find(s => s.id === serviceId);
     setServices(prev => prev.filter(s => s.id !== serviceId));
@@ -1456,6 +1471,8 @@ export default function App() {
   };
 
   const handleConfirmDebit = (service: ServiceRecord, additionalDebit: number, reason: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const updatedDebit = (service.valueDebit || 0) + additionalDebit;
     const noteAppend = reason ? ` [Débito +${formatCurrency(additionalDebit)}: ${reason}]` : '';
@@ -1507,6 +1524,8 @@ export default function App() {
     method: PaymentMethod,
     paymentDate: string
   ) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const newPaidTotal = (service.valuePaid || 0) + paymentAmount;
     const totalDue = (service.valueCharged || 0) + (service.valueDebit || 0);
@@ -1562,6 +1581,8 @@ export default function App() {
 
   // --- Handlers: Status Dropdown Quick Change ---
   const handleStatusChange = (service: ServiceRecord, newStatus: PaymentStatus) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     let newPaid = service.valuePaid;
     const totalDue = service.valueCharged + (service.valueDebit || 0);
@@ -1614,6 +1635,8 @@ export default function App() {
   };
 
   const handleAddPhotosToService = (serviceId: string, newPhotos: ServicePhoto[]) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const updatedList = services.map((s) => {
       if (s.id === serviceId) {
@@ -1658,6 +1681,8 @@ export default function App() {
   };
 
   const handleDeletePhotoFromService = (serviceId: string, photoId: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const updatedList = services.map((s) => {
       if (s.id === serviceId) {
@@ -1695,6 +1720,8 @@ export default function App() {
 
   // --- Handlers: Store Management ---
   const handleSaveStore = (newStore: StoreProfile) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const storeToSave: StoreProfile = (isClient && user)
       ? { ...newStore, ownerEmail: newStore.ownerEmail || user.email }
@@ -1855,6 +1882,8 @@ export default function App() {
   };
 
   const handleDeleteStore = (storeId: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     const target = stores.find(st => st.id === storeId);
     const targetCleanDoc = target ? cleanDocument(target.cleanCnpj || target.cnpj) : '';
@@ -1889,6 +1918,8 @@ export default function App() {
   };
 
   const handleResetAllServices = () => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     setServices([]);
     saveServices([]);
     addNotificationRecord({
@@ -1905,6 +1936,8 @@ export default function App() {
 
   // --- Handlers: Obras Management ---
   const handleSaveObra = (obra: ObraRecord) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     setObras((prev) => {
       const exists = prev.findIndex(o => o.id === obra.id);
@@ -1931,6 +1964,8 @@ export default function App() {
   };
 
   const handleDeleteObra = (id: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     setObras((prev) => {
       const updated = prev.filter(o => o.id !== id);
@@ -2014,6 +2049,8 @@ export default function App() {
   };
 
   const handleDeleteVisita = (id: string) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     setVisitas((prev) => {
       const updated = prev.filter(v => v.id !== id);
@@ -2068,6 +2105,8 @@ export default function App() {
   };
 
   const handleUpdatePixConfig = (newCfg: PixPaymentConfig) => {
+    // Perfil do cliente é somente consulta: registros administrativos não podem ser alterados.
+    if (user?.role !== 'admin') return;
     if (isClient) return;
     setPixConfig(newCfg);
     savePixPaymentConfig(newCfg);
@@ -2089,30 +2128,35 @@ export default function App() {
   if (accessApprovalStatus !== 'none' && !user) {
     const rejected = accessApprovalStatus === 'rejected';
     const checking = accessApprovalStatus === 'checking';
+    const noStores = accessApprovalStatus === 'no_stores';
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 px-6">
         <div className="flex max-w-md flex-col items-center gap-4 text-center">
-          {!rejected && (
+          {!rejected && !noStores && (
             <div className="h-10 w-10 rounded-full border-4 border-emerald-700/20 border-t-emerald-700 animate-spin" />
           )}
           <h2 className="text-lg font-semibold text-slate-800">
-            {rejected ? 'Solicitação não aprovada' : checking ? 'Validando sua autorização' : 'Cadastro recebido'}
+            {rejected ? 'Solicitação não aprovada'
+              : noStores ? 'Nenhum estabelecimento liberado'
+              : checking ? 'Validando sua autorização' : 'Cadastro recebido'}
           </h2>
           <p>
             {rejected
               ? 'Sua solicitação foi rejeitada ou seu acesso foi suspenso. Entre em contato com o administrador.'
+              : noStores
+                ? 'Seu cadastro continua ativo, mas no momento não há nenhum estabelecimento liberado para a sua conta. Assim que o administrador vincular um estabelecimento, o acesso será aberto automaticamente.'
               : checking
                 ? 'Estamos confirmando a aprovação e os estabelecimentos vinculados à sua conta. Seus dados permanecem protegidos durante essa verificação.'
                 : 'Seu cadastro foi recebido e está aguardando a liberação do administrador. Assim que o acesso for aprovado, o sistema será aberto automaticamente.'}
           </p>
-          {rejected && (
+          {(rejected || noStores) && (
             <button
               type="button"
               onClick={() => { void executeGoogleLogout(); }}
               className="rounded-lg bg-emerald-800 px-5 py-2.5 font-medium text-white"
             >
-              Voltar ao login
+              {rejected ? 'Voltar ao login' : 'Sair desta conta'}
             </button>
           )}
         </div>
